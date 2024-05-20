@@ -1,0 +1,22 @@
+/*
+				if (old_tile_selected == -1 && tile_selected == -1)
+				{
+					POINT tempPoint = {pai_pos[0].x, pai_pos[0].y - SELECTED_UP};
+					RECT tempRect = {tempPoint.x, tempPoint.y, 
+						tempPoint.x + showtilenum * (TILE_STRAIGHT_WIDTH + TILE_SPACE), pai_pos[0].y + 1};
+					tableimage.BitBlt(hdc, tempRect, tempPoint, SRCCOPY);
+				}
+				if (tile_selected != -1)
+				{
+					POINT tempPoint = {pai_pos[0].x + tile_selected * (TILE_STRAIGHT_WIDTH + TILE_SPACE), pai_pos[0].y - SELECTED_UP + TILE_STRAIGHT_HEIGHT};
+					RECT tempRect = {tempPoint.x, tempPoint.y, 
+						tempPoint.x + (TILE_STRAIGHT_WIDTH + TILE_SPACE), pai_pos[0].y + TILE_STRAIGHT_HEIGHT};
+					tableimage.BitBlt(hdc, tempRect, tempPoint, SRCCOPY);
+				}
+				if (old_tile_selected != -1 && old_tile_selected != tile_selected)
+				{
+					POINT tempPoint = {pai_pos[0].x + old_tile_selected * (TILE_STRAIGHT_WIDTH + TILE_SPACE), pai_pos[0].y - SELECTED_UP};
+					RECT tempRect = {tempPoint.x, tempPoint.y, 
+						tempPoint.x + (TILE_STRAIGHT_WIDTH + TILE_SPACE), pai_pos[0].y + 1};
+					tableimage.BitBlt(hdc, tempRect, tempPoint, SRCCOPY);
+				}*/

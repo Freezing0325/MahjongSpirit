@@ -1,0 +1,47 @@
+void CMahjongSpiritDlg::LoadPicture(CString strFile)
+{
+	HANDLE hFile = CreateFile(strFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+	DWORD dwFileSize = GetFileSize(hFile, NULL); // 获得文件大小
+	HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, dwFileSize); // 分配全局内存，获得内存句柄
+	LPVOID pvData = GlobalLock(hGlobal); //锁定内存，获得内存指针，LPVOID指向任何类型值(32bit)
+	DWORD dwBytesRead = 0; // DWORD：32bit 无符号整数
+	BOOL bRead = ReadFile(hFile, pvData, dwFileSize, &dwBytesRead, NULL); 								// 读取文件
+	GlobalUnlock(hGlobal);
+	CloseHandle(hFile);
+
+	LPSTREAM pstm = NULL;  //指向一个流的指针，用来存放图片
+	HRESULT hr = CreateStreamOnHGlobal(hGlobal, TRUE, &pstm);	 //从内存数据创建IStream*
+	if (m_pPicture) 				// 创建IPicture
+		m_pPicture->Release();
+
+	// 从IStream接口中载入图片到 IPicture中
+	hr = ::OleLoadPicture(pstm, dwFileSize, FALSE, IID_IPicture, (LPVOID *)&m_pPicture);
+	pstm->Release();		 // 释放IStream接口
+	Invalidate();	 		// 强制重新绘制窗口	
+}
+
+//LoadPicture(_T("D:\\尹思昱\\SSS计划\\AI 计划\\MAHJONG\\MahjongSpirit\\MahjongSpirit\\封面.jpg"));
+
+/*
+	if(m_pPicture)
+	{ 
+		long hmWidth,hmHeight;
+		m_pPicture->get_Width(&hmWidth);
+		m_pPicture->get_Height(&hmHeight);
+		int nWidth= MulDiv(hmWidth, GetDeviceCaps(pDC->GetSafeHdc(),LOGPIXELSX), HIMETRIC_INCH);
+		int nHeight= MulDiv(hmHeight, GetDeviceCaps(pDC->GetSafeHdc(),LOGPIXELSY), HIMETRIC_INCH);
+		CRect rc;		
+		GetClientRect(&rc); 
+		CDC memdc;				// 创建内存DC
+		memdc.CreateCompatibleDC(pDC);	
+		CBitmap bmp; 				// 创建位图
+		bmp.CreateCompatibleBitmap(pDC, nWidth, nHeight);
+		memdc.SelectObject(bmp); 	// 将位图选入内存DC
+		m_pPicture->Render(memdc.GetSafeHdc(), 0, 0, nWidth,nHeight, 0, hmHeight, hmWidth, -hmHeight, &rc); 
+		//将图片以原始尺寸绘制到内存DC中
+		pDC->StretchBlt(0,0,nWidth,nHeight,&memdc,0,0,nWidth,nHeight,SRCCOPY);  	// 从内存DC缩放拷贝到显示DC
+	}
+	*/
+
+private:
+	void LoadPicture(CString strFile);
