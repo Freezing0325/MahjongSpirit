@@ -1964,6 +1964,10 @@ hupaiinfo pai::ifhu(singletile lasttile, bool test, UINT nFlags, matchinfo match
 						for (fanzhong = fanzhong_fanshu[i]; fanzhong[0] != '\0'; fanzhong += zishusize[i])
 							if(strstr(result.fanzhong, fanzhong) != NULL && (i > 0 || (fulu.groupsum != 0 && fulu.feimenqing)))
 								result.fanshu += fanshu[i];
+					// 双立直和立直可能重复判断
+					if (strstr(result.fanzhong, "双立直") != NULL)
+						result.fanshu -= 1;
+
 					// 役牌可能有多种（不会有三种，因为三种为大三元），需要重复判断
 					char *temp = strstr(result.fanzhong, "役牌");
 					if (temp != NULL)

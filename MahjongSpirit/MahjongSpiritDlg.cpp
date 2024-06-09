@@ -18,6 +18,7 @@
 //20230715_0116：各种动作均有了动画效果，美术性差不多得了:D，他家之间的吃牌碰牌会出现“幻影牌”的BUG，已知是在动画后mypai=robot.getpai时两者不同的缘故，需要细查为什么robot出牌后牌还在（已解决）；可以的话还是希望解决一下听牌后听牌提示于出牌前后闪现的问题（已解决）；有的时候他家吃完牌就无响应了（暂时没出现了）。截止现在一共7536行代码。
 //20230716_0202：前一天的各种问题已经解决，如今体验较好，下一步：记分板！！！
 //20230717_0053：解决了里宝牌闪现的问题，代打时无法正常立直的问题，把桌面图片改成代码绘图，增加了绘图辅助模式，增加了玩家名和分数的显示，大致写了分数更改的框架，具体没实现
+//20240609_2157：解决了代打模式中选择出错的问题，解决了分析自己牌时遇到开杠会卡住的问题，解决了对自己牌分析时会重复计算新摸牌的问题。但是发现一个问题：有的时候可能需要刻意拆掉暗杠而不开杠，这个时候机器人会直接开杠。自己的代打和建议系统也不统一。
 
 #include "stdafx.h"
 
@@ -160,8 +161,10 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	match_info.frame_status = 0;
 	match_info.match_wind = east;
 	match_info.game_num = 0;
+	match_info.round = 0;
 	match_info.thisdealer_num = 0;
 	match_info.RiichiBarSum = 0;
+	match_info.tenhou_possible = true;
 	frame_start = true;
 	IfShowChooseColumn = false;
 	IfShowChiFuluHint = false;
@@ -173,7 +176,7 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	pHupaiInfo = nullptr;
 	pRulesSettingsDlg = new CRulesSettingsDlg;
 	ThisSeed = (unsigned int)time(NULL);
-	//ThisSeed = 1689609958;
+	ThisSeed = 1717925798;
 	/*
 	一些种子：
 	1689440075：开局会有很多碰牌
@@ -181,6 +184,7 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	1689442464：流局，自己有机会立直，南家会立直
 	1689442849：第二局有好牌
 	1689481232：第一局西家有长考，第二局有人和牌拦截吃牌
+	1717925798：双立直
 	*/
 	srand(ThisSeed);
 	match_info.this_dealer = direction(rand() % 4);
@@ -559,6 +563,7 @@ void CMahjongSpiritDlg::OnPaint()
 							//static hupaiinfo my_hupai_info;
 							BYTE HuFlags = 0;
 							HuFlags |= HU_RIICHI * ((WinPaiStatus & PAI_STATUS_RIICHI) != 0);
+							HuFlags |= HU_WRIICHI * ((WinPaiStatus & PAI_STATUS_WRIICHI) != 0);
 							HuFlags |= HU_IPPATSU * ((WinPaiStatus & PAI_STATUS_IPPATSU) != 0);
 							HuFlags |= HU_TENHOU * match_info.tenhou_possible;
 							HuFlags |= HU_RINSHAN * ((WinPaiStatus & PAI_STATUS_RINSHAN) != 0);
@@ -864,12 +869,11 @@ UINT GetMyResponseThreadProc(LPVOID pParam)
 			ChoiceByte = CHOOSE_CHI;
 		else if (tempDlg->MyResponse.response != RESPONSE_PASS && tempDlg->MyResponse.response != RESPONSE_OUT)
 			ChoiceByte = 1 << (tempDlg->MyResponse.response - 1);
-		if ((tempDlg->ChooseFlags & CHOOSE_HU) != 0)
-			bool flag = true;
-		for (int Choice = ChoiceByte; Choice > 0; Choice >>= 1)
-			tempDlg->FinalChoice += ((Choice & tempDlg->ChooseFlags) != 0);
-		if (tempDlg->FinalChoice == 0)
+		if (ChoiceByte == 0)
 			tempDlg->FinalChoice = -1;
+		else
+			for (int Choice = CHOOSE_HU; Choice >= ChoiceByte; Choice >>= 1)
+				tempDlg->FinalChoice += ((Choice & tempDlg->ChooseFlags) != 0);
 	}
 	tempDlg->Invalidate(false);
 	return 0;
@@ -1036,6 +1040,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 
 				if (frame_start)
 				{
+					// 如果庄家上局获胜，或流局后听牌，则本场数增加；否则轮庄
 					if ((match_info.win_direction == match_info.this_dealer && match_info.frame_status > 0)
 						|| (match_info.win_direction == noneed && (remaintiles.get_tilesum() > 4 || mypai[match_info.this_dealer].iftingpai())))
 					{
@@ -1048,19 +1053,23 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 						match_info.game_num = (match_info.game_num + 1) % 4;
 					}
 
+					// 重置余牌
 					for (int type_num = 0; type_num < 37; type_num ++)
 						if (type_num % 10 != 9)
 						{
 							remaintiles.set_tilenum(type_num / 10, type_num % 10, 4);
 							isee_remaintiles.set_tilenum(type_num / 10, type_num % 10, 4);
 						}
+
+
 					match_info.kansum = 0;
 					match_info.round = 0;
 					match_info.frame_status = FRAME_NORMAL;
 					match_info.active_direction = direction((match_info.this_dealer + 3) % 4);
 					match_info.active_tile = defaulttile;
 					match_info.chankan_possible = false;
-					
+					match_info.tenhou_possible = true;
+
 					for (int havegettilenum = 0; havegettilenum < 10; havegettilenum++)
 					{
 						singletile thistile = remaintiles.get_randomtile();
@@ -1181,9 +1190,12 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 							BYTE MyPossibleResponse = 0x0;
 							if (MySeat == direction(seat))
 							{
+								// 不处于选择状态，且并非结束选择，则还没有判断是否可以选择
 								if (!Choosing && !choose_completed)
 								{
+									// 获得可能的选择
 									MyPossibleResponse = mypai[0].get_possible_response(match_info, MySeat);
+									// 牌型可以和牌，没有振听，且有役，则可以选择和牌
 									if (((MyPossibleResponse & POSSIBILITY_RON) != 0) && ((robot[0].get_paistatus() & PAI_STATUS_FURITEN) == 0))
 									{
 										pai TempPai = mypai[0];
@@ -1199,6 +1211,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 											ChooseFlags |= CHOOSE_HU;
 										}
 									}
+									// 自己没有立直，且并非在进行抢杠的判断，则可以判断是否吃、碰、大明杠
 									if (((robot[0].get_paistatus() & PAI_STATUS_RIICHI) == 0) && !match_info.chankan_possible)
 									{
 										if (match_info.active_direction == (MySeat + 3) % 4 && match_info.active_tile.type != 3)
@@ -1220,18 +1233,22 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 										}
 									}
 								}
+								// 判断结束，没有选择或者只有吃的选择，则己方分析完毕
 								if (!Choosing || ((ChooseFlags & ~CHOOSE_CHI) == 0))
 									AnalysisCompleted[i] = true;
 							}
 							else
 							{
+								// 分析其它玩家
 								MyPossibleResponse = mypai[seat].get_possible_response(match_info, direction(seat));
+								// 没有可能的选择，则直接跳过，进行下一个分析
 								if (MyPossibleResponse == POSSIBILITY_NULL)
 								{
 									AnalysisCompleted[i] = true;
 									OtherResponse[i].response = RESPONSE_PASS;
 									continue;
 								}
+								// 开始分析
 								if (!analysis_begin)
 								{
 									analysis_completed = false;
@@ -1239,6 +1256,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 									AfxBeginThread(GetResponseThreadProc, (LPVOID)this);
 									analysis_begin = true;
 								}
+								// 结束分析
 								if (analysis_completed)
 								{
 									OtherResponse[i] = TempResponse;
@@ -1246,8 +1264,10 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 									analysis_completed = false;
 									AnalysisCompleted[i] = true;
 								}
+								// 分析过程中，则直接跳出，不再执行后续代码
 								else
 									break;
+								//他家点和
 								if (OtherResponse[i].response == RESPONSE_WIN)
 								{
 									match_info.frame_status = FRAME_WIN;
@@ -1255,9 +1275,8 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 									SpecialAction.ActionType = RESPONSE_WIN;
 									Choosing = false;
 									break;
-									//他家点和
 								}
-								if (OtherResponse[i].response == RESPONSE_PON || OtherResponse[(seat - match_info.active_direction) % 4 - 1].response == RESPONSE_KAN)
+								if (OtherResponse[i].response == RESPONSE_PON || OtherResponse[i].response == RESPONSE_KAN)
 								{
 									PonDirection = direction(seat);
 								}
@@ -1291,12 +1310,14 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								{
 									match_info.active_direction = MySeat;
 								}
+								// 没人吃碰杠，则摸牌，若此刻是抢杠的判断，则结束抢杠的判断，开杠者摸牌，否则摸牌者正常轮换
 								else if (!Choosing)
 								{
 									if (match_info.chankan_possible)
 									{
 										for (int seat = 0; seat < 4; seat ++)
 											robot[seat].remove_paistatus(PAI_STATUS_IPPATSU);
+										match_info.tenhou_possible = false;
 										if (match_info.active_direction != MySeat)
 											mypai[match_info.active_direction] = robot[match_info.active_direction].get_pai();
 										match_info.chankan_possible = false;
@@ -1326,6 +1347,8 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 						if (Choosing)			//正在选择
 						{
 							static bool me_analysis_begin = false;
+							if ((ChooseFlags & CHOOSE_KAN) != 0)
+								bool flag = true;
 							if (FinalChoice == 0)
 							{
 								IfShowChooseColumn = true;		//弹出选择栏
@@ -1333,7 +1356,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								{
 									if (!me_analysis_begin)
 									{
-										robot[0].set_pai(tempmypai);
+										robot[0].set_pai(mypai[0]);
 										//me_analysis_completed = false;
 										pMyRobot = &robot[0];
 										AfxBeginThread(GetMyResponseThreadProc, (LPVOID)this);
@@ -1442,13 +1465,17 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								{
 									tempmypai = mypai[0];
 									tempmypai.change_tilenum(gettile, 1);
-									robot[0].set_pai(tempmypai);
+									robot[0].set_pai(mypai[0]);
 									tenpai_analysis = false;
 									if ((robot[0].get_paistatus() & PAI_STATUS_RIICHI) == 0)
 										robot[0].remove_paistatus(PAI_STATUS_FURITEN);
 									mypai[0].remove_tile_status(TILE_RECOMMEND);
 									NewTile.remove_tile_status(TILE_RECOMMEND);
 								}
+								if (match_info.active_direction == match_info.this_dealer && !match_info.chankan_possible)
+									match_info.round ++;
+								if (match_info.round > 1)
+									match_info.tenhou_possible = false;
 								tile_out = -1;
 								mopai_completed = false;
 								NewTile.set_tilenum(gettile, 1);
@@ -1630,7 +1657,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 										MakeRefresh = true;
 									}
 								}
-								else
+								else if (!MeAutoMode || !Choosing) 
 								{
 									// 摸牌完成，分析建议打的牌
 									if (!mopai && !tileout_completed)
@@ -1987,6 +2014,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 												mopai = true;
 												for (int seat = 0; seat < 4; seat ++)
 													robot[seat].remove_paistatus(PAI_STATUS_IPPATSU);
+												match_info.tenhou_possible = false;
 											}
 											tempmypai.post_stop_analysis();
 											analysis_completed = false;
@@ -2119,6 +2147,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 							break;
 						case RESPONSE_RIICHI:
 							robot[SpecialAction.ActionDirection].add_paistatus(PAI_STATUS_RIICHI);
+							if (match_info.tenhou_possible) robot[SpecialAction.ActionDirection].add_paistatus(PAI_STATUS_WRIICHI);
 							if (SpecialAction.ActionDirection == MySeat)
 							{
 								// 即将打出立直宣告牌，判断出牌的有效性
@@ -2171,6 +2200,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								analysis_completed = false;
 								robot[SpecialAction.ActionDirection].act(match_info);
 								for (int seat = 0; seat < 4; seat ++) robot[seat].remove_paistatus(PAI_STATUS_IPPATSU);
+								match_info.tenhou_possible = false;
 							}
 							else
 							{
@@ -2188,6 +2218,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 										mopai = true;
 										for (int seat = 0; seat < 4; seat ++)
 											robot[seat].remove_paistatus(PAI_STATUS_IPPATSU);
+										match_info.tenhou_possible = false;
 										mypai[match_info.active_direction] = robot[match_info.active_direction].get_pai();
 									}
 									NewTile.reset_all();
@@ -2219,6 +2250,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								tenpai_analysis = false;
 								for (int seat = 0; seat < 4; seat ++)
 									robot[seat].remove_paistatus(PAI_STATUS_IPPATSU);
+								match_info.tenhou_possible = false;
 								MakeRefresh = true;
 							}
 							break;
