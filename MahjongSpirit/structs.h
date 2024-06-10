@@ -28,7 +28,7 @@
 #define FRAME_WIN 0x20
 
 enum grouptype {shun = 1, ke, kan, ankan};
-enum direction {east, south, west, north, noneed};
+enum direction {east, south, west, north, noneed, none};
 
 
 struct getpointinfo;
@@ -183,6 +183,7 @@ struct matchinfo
 	singletile active_tile;		//当前活跃牌
 	bool chankan_possible;		//是否处于可以抢杠的状态
 	int RiichiBarSum;			//当前场上立直棒的总数
+	bool DoubleWindTile;		//连风对子是否记4符
 	void print_dora(const HDC &hdc, const POINT &printpos, const BYTE &ura_visible = 0);
 	void print_dora(const HDC &hdc, const int &x, const int &y, const BYTE &ura_visible = 0);
 };

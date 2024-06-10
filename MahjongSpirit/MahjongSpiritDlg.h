@@ -90,9 +90,25 @@ public:
 	POINT ChooseColumnPos;		//选择栏位置
 	POINT pai_pos[4];			//牌位置
 	POINT paihe_pos[4];			//牌河位置
+	RECT MarksBoxSize;			//分数框的大小参数
+	int Marks[10][4];			//分数
+	int MatchNum;				//已经结束的局数
+
+	int OriginPoints;			//初始点数
+	int RankHorse_1,
+		RankHorse_2;			//顺位马
+	bool TopBonus;			//头名赏
+	int BackPoints;				//返点
+	BYTE MatchFormat;			//赛制
+	bool OpenQuadRenShan;	//大明杠岭上开花包牌
+	bool DrawMangan;		//流局满贯
+	bool NineOrphans;		//九种九牌流局
+	bool NegativeEnd;		//击飞（负分结束）
+	bool ChanAnKan;			//十三幺抢暗杠
 
 	int FinalChoice;			//最终选项
 	bool frame_start;			//是否重开一局
+	bool RobotInfoInitialize;	//机器人是否完成初始化
 
 	MahjongRobot* pTempRobot;	//需要进行分析的电脑
 	MahjongRobot* AllRobot;		//所有的机器人指针
@@ -110,11 +126,12 @@ public:
 	bool IfShowChooseColumn;	//是否显示选择栏	
 	bool IfShowChiFuluHint;		//是否显示吃牌提示
 	bool IfShowTenpaiHint;		//是否显示听牌提示
+	bool IfShowMarks;			//是否显示得分情况
 
 	bool IfShowCutScenes;		//是否显示过场动画
 	int CutRate;				//过场动画显示进度
 	int CutScenesDirection;		//过场动画显示方向
-	enum {None, ScenesEnd, ShowMatchInfo, ShowAction, ShowPointsChange} CutScenesType;		//过场动画的类别
+	enum {None, ScenesEnd, ShowMatchInfo, ShowAction, ShowPointsChange, ShowMatchEnd} CutScenesType;		//过场动画的类别
 	struct {direction ActionDirection; BYTE ActionType;} SpecialAction;
 
 	POINT MousePoint;		//当前鼠标位置
@@ -143,4 +160,5 @@ public:
 	afx_msg void OnGamesettingRules();
 	afx_msg void OnGamesettingMarks();
 	afx_msg void OnGamesettingReset();
+	void UpdateRules(bool FromMain);
 };

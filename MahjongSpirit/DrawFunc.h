@@ -58,7 +58,7 @@ BOOL ShowTransparentText(CWnd* DestControl, CWnd* BackControl, CString Text, CSt
 // 实现两张图像的渐变
 BOOL ChangeSurface(CWnd* SurfaceControl, CImage& LastSurface, CImage& NextSurface, int enter_rate);
 // 在特定位置显示特定颜色的半透明提示框
-BOOL ShowHintBox(HDC Hdc, POINT ShowPos, int Width, int Height, COLORREF BoxColor = RGB(0, 0, 255));
+BOOL ShowHintBox(HDC Hdc, POINT ShowPos, int Width, int Height, COLORREF BoxColor = RGB(0, 0, 255), BYTE Alpha = 100);
 // 从资源文件中读取图片资源
 bool LoadImageFromResource(CImage& DestImage, UINT nResID, LPCTSTR lpTyp);
 bool CreateDefaultCutScenesImage(CImage& DestImage, int Direction, int DlgWidth, int DlgHeight, const COLORREF &BackColor = RGB(220, 220, 220));

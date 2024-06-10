@@ -13,7 +13,7 @@ IMPLEMENT_DYNAMIC(CRulesSettingsDlg, CDialogEx)
 
 CRulesSettingsDlg::CRulesSettingsDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CRulesSettingsDlg::IDD, pParent)
-	, MatchSystem(2)
+	, MatchFormat(2)
 	, DoubleWindTile(true)
 	, OpenQuadRenShan(false)
 	, DrawMangan(false)
@@ -21,10 +21,10 @@ CRulesSettingsDlg::CRulesSettingsDlg(CWnd* pParent /*=NULL*/)
 	, NegativeEnd(false)
 	, ChanAnKan(true)
 	, TopBonus(false)
-	, MatchOriginMarks(25000)
-	, HorseMarksX(10)
-	, HorseMarksY(5)
-	, ReturnMarks(30000)
+	, BackMarks(30000)
+	, RankHorse_1(10)
+	, RankHorse_2(5)
+	, OriginPoints(25000)
 {
 
 }
@@ -36,10 +36,10 @@ CRulesSettingsDlg::~CRulesSettingsDlg()
 void CRulesSettingsDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
-	DDX_Text(pDX, IDC_EDIT_ORIGINMARKS, MatchOriginMarks);
-	DDX_Text(pDX, IDC_EDIT_HORSEMARKS_X, HorseMarksX);
-	DDX_Text(pDX, IDC_EDIT_HORSEMARKS_Y, HorseMarksY);
-	DDX_Text(pDX, IDC_EDIT_RETURNMARKS, ReturnMarks);
+	DDX_Text(pDX, IDC_EDIT_ORIGINMARKS, OriginPoints);
+	DDX_Text(pDX, IDC_EDIT_HORSEMARKS_X, RankHorse_1);
+	DDX_Text(pDX, IDC_EDIT_HORSEMARKS_Y, RankHorse_2);
+	DDX_Text(pDX, IDC_EDIT_RETURNMARKS, BackMarks);
 	DDX_Control(pDX, IDC_EDIT_RETURNMARKS, m_EditReturnMarks);
 }
 
@@ -82,7 +82,7 @@ BOOL CRulesSettingsDlg::OnInitDialog()
 
 	UpdateData(false);
 	
-	CheckRadioButton(IDC_RADIO_EASTONLY, IDC_RADIO_FULLMATCH, IDC_RADIO_EASTONLY + MatchSystem - 1);
+	CheckRadioButton(IDC_RADIO_EASTONLY, IDC_RADIO_FULLMATCH, IDC_RADIO_EASTONLY + MatchFormat - 1);
 	CheckRadioButton(IDC_RADIO_TWOFU, IDC_RADIO_FOURFU, IDC_RADIO_TWOFU + DoubleWindTile);
 	CheckRadioButton(IDC_RADIO_RENSHAN_PAYALL, IDC_RADIO_RENSHAN_NOTPAYALL, IDC_RADIO_RENSHAN_NOTPAYALL - OpenQuadRenShan);
 	CheckRadioButton(IDC_RADIO_DRAWMANGAN_ON, IDC_RADIO_DRAWMANGAN_OFF, IDC_RADIO_DRAWMANGAN_OFF - DrawMangan);
@@ -105,7 +105,7 @@ void CRulesSettingsDlg::OnBnClickedButtonSaverules()
 	if (Response == IDYES)
 	{
 		UpdateData(true);
-		MatchSystem = GetCheckedRadioButton(IDC_RADIO_EASTONLY, IDC_RADIO_FULLMATCH) - IDC_RADIO_EASTONLY + 1;
+		MatchFormat = GetCheckedRadioButton(IDC_RADIO_EASTONLY, IDC_RADIO_FULLMATCH) - IDC_RADIO_EASTONLY + 1;
 		DoubleWindTile = GetCheckedRadioButton(IDC_RADIO_TWOFU, IDC_RADIO_FOURFU) - IDC_RADIO_TWOFU;
 		OpenQuadRenShan = GetCheckedRadioButton(IDC_RADIO_RENSHAN_PAYALL, IDC_RADIO_RENSHAN_NOTPAYALL) == IDC_RADIO_RENSHAN_PAYALL;
 		DrawMangan = GetCheckedRadioButton(IDC_RADIO_DRAWMANGAN_ON, IDC_RADIO_DRAWMANGAN_OFF) == IDC_RADIO_DRAWMANGAN_ON;

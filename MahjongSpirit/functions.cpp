@@ -346,9 +346,6 @@ BOOL TileToImage(CImage& DestImage, int type, int tile, int seat, bool visible, 
 	AllTileFrameImage.ReleaseDC();
 	
 	DestImage.ReleaseDC();
-	//AllTilesImage.Destroy();
-	//AllTileFrameImage.Destroy();
-	//_CrtDumpMemoryLeaks();
 	
 	return true;
 }

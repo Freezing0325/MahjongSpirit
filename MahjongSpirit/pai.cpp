@@ -2007,9 +2007,11 @@ hupaiinfo pai::ifhu(singletile lasttile, bool test, UINT nFlags, matchinfo match
 					{
 						if (FinalGeneral.num >= 4)
 							result.fushu += 2;
-						if (FinalGeneral.num == (self_direction - match_info.this_dealer + 4) % 4)
-							result.fushu += 2;
-						if (FinalGeneral.num == match_info.match_wind)
+						bool SelfWindTile = (FinalGeneral.num == (self_direction - match_info.this_dealer + 4) % 4);
+						bool MatchWindTile = (FinalGeneral.num == match_info.match_wind);
+						if (match_info.DoubleWindTile && SelfWindTile && MatchWindTile)
+							result.fushu += 4;
+						else if (SelfWindTile || MatchWindTile)
 							result.fushu += 2;
 					}
 					for (int i = 0; i < hutile.groupsum; i++)

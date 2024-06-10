@@ -161,7 +161,7 @@ void ShowChooseColumn(HDC Hdc, int ShowY, UINT nFlags)
 	ChooseColumnImage.Destroy();
 }
 
-BOOL ShowHintBox(HDC Hdc, POINT ShowPos, int Width, int Height, COLORREF BoxColor)
+BOOL ShowHintBox(HDC Hdc, POINT ShowPos, int Width, int Height, COLORREF BoxColor, BYTE Alpha)
 {
 	CImage BoxImage;
 	RECT BoxRect = {0, 0, Width, Height};
@@ -170,7 +170,7 @@ BOOL ShowHintBox(HDC Hdc, POINT ShowPos, int Width, int Height, COLORREF BoxColo
 	HBRUSH hBr = CreateSolidBrush(BoxColor);
 	FillRect(hCoverColorDC, &BoxRect, hBr);
 	DeleteObject(hBr);
-	BOOL Flag = BoxImage.AlphaBlend(Hdc, ShowPos, 100);
+	BOOL Flag = BoxImage.AlphaBlend(Hdc, ShowPos, Alpha);
 	BoxImage.ReleaseDC();
 	BoxImage.Destroy();
 	return Flag;

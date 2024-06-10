@@ -19,6 +19,8 @@
 //20230716_0202：前一天的各种问题已经解决，如今体验较好，下一步：记分板！！！
 //20230717_0053：解决了里宝牌闪现的问题，代打时无法正常立直的问题，把桌面图片改成代码绘图，增加了绘图辅助模式，增加了玩家名和分数的显示，大致写了分数更改的框架，具体没实现
 //20240609_2157：解决了代打模式中选择出错的问题，解决了分析自己牌时遇到开杠会卡住的问题，解决了对自己牌分析时会重复计算新摸牌的问题。但是发现一个问题：有的时候可能需要刻意拆掉暗杠而不开杠，这个时候机器人会直接开杠。自己的代打和建议系统也不统一。
+//20240610_1752：实现了牌局的结束与重置，实现了计分，实现了大部分规则，但是局末时有时候会出现出黑牌，机制不明。九种九牌流局、大明杠包牌以及流局满贯尚未实现。
+
 
 #include "stdafx.h"
 
@@ -85,6 +87,8 @@ CMahjongSpiritDlg::CMahjongSpiritDlg(CWnd* pParent /*=NULL*/)
 	, IfShowCutScenes(false)
 	, CutRate(0)
 	, pRulesSettingsDlg(nullptr)
+	, RobotInfoInitialize(false)
+	, MatchNum(0)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	m_pPicture = NULL;
@@ -150,33 +154,30 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	GetClientRect(&client_rect);
 	dlg_width = client_rect.right - client_rect.left;
 	dlg_height = client_rect.bottom - client_rect.top;
+
+	int MarksBoxWidth = 600;
+	int MarksBoxHeight = 400;
+	MarksBoxSize.left = (dlg_width - MarksBoxWidth) / 2;
+	MarksBoxSize.right = (dlg_width + MarksBoxWidth) / 2;
+	MarksBoxSize.top = (dlg_height - MarksBoxHeight) / 2;
+	MarksBoxSize.bottom = (dlg_height + MarksBoxHeight) / 2;
+	for (int i = 0; i < 10; i++)
+		for (int j = 0; j < 4; j++)
+			Marks[i][j] = -1;
+
+	
+	pRulesSettingsDlg = new CRulesSettingsDlg;
+	UpdateRules(false);
+
 	ifshowcover = true;
 	startbtn_alpha = 255;
-	tile_selected = -1;
-	tile_out = -1;
 	MeAutoMode = false;
 	AllVisible = false;
 	DebugMode = false;
 	DrawMode = false;
-	match_info.frame_status = 0;
-	match_info.match_wind = east;
-	match_info.game_num = 0;
-	match_info.round = 0;
-	match_info.thisdealer_num = 0;
-	match_info.RiichiBarSum = 0;
-	match_info.tenhou_possible = true;
-	frame_start = true;
-	IfShowChooseColumn = false;
-	IfShowChiFuluHint = false;
-	IfShowTenpaiHint = false;
-	MousePoint.x = MousePoint.y = 0;
-	CutScenesType = None;
-	SetTimer(1, 100, NULL);
-	AllRobot = nullptr;
-	pHupaiInfo = nullptr;
-	pRulesSettingsDlg = new CRulesSettingsDlg;
+
 	ThisSeed = (unsigned int)time(NULL);
-	ThisSeed = 1717925798;
+	//ThisSeed = 1717925798;
 	/*
 	一些种子：
 	1689440075：开局会有很多碰牌
@@ -184,11 +185,14 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	1689442464：流局，自己有机会立直，南家会立直
 	1689442849：第二局有好牌
 	1689481232：第一局西家有长考，第二局有人和牌拦截吃牌
-	1717925798：双立直
+	1717925798：第二轮的第三局左右有双立直
 	*/
 	srand(ThisSeed);
-	match_info.this_dealer = direction(rand() % 4);
 	
+	OnGamesettingReset();
+	AllRobot = nullptr;
+	pHupaiInfo = nullptr;
+
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -475,7 +479,6 @@ void CMahjongSpiritDlg::OnPaint()
 				//牌面打印
 				if (tileout_completed)
 				{
-					//mypai[match_info.active_direction] = robot[match_info.active_direction].get_pai();
 					for (int seat = 0; seat < 4; seat++)
 					{
 						mypai[seat].print_tiles(hdc, pai_pos[seat], seat, PaiVisible[seat]/*seat != 0*/, tile_selected);
@@ -625,21 +628,13 @@ void CMahjongSpiritDlg::OnPaint()
 		switch (CutScenesType)
 		{
 		case CMahjongSpiritDlg::ShowAction:
+			// 显示特殊动作
 			{
-				//CImage BackImage;
-				/*CreateDefaultCutScenesImage(BackImage, CutScenesDirection, dlg_width, dlg_height);
-				double LoadRate = 0;
-				if (CutRate <= 4) LoadRate = (CutRate - 4) / 4.0;
-				if (CutRate >= 96) LoadRate = (CutRate - 96) / 4.0;
-				POINT ShowPos = {0, dlg_height / 2 - 100};
-				ShowCutScenes(hdc, BackImage, dlg_width, dlg_height, ShowPos, LoadRate, 0);*/
 				ShowCutScenes(hdc, CutScenesDirection, CutRate, dlg_width, dlg_height);
 				if (CutRate > 4 && CutRate < 96)
 				{
 					CString ActionInfoText; 
 					const wchar_t ActionName[6][3] = {_T("吃"), _T("碰"), _T("杠"), _T("立直"), _T("和"), _T("自摸")};
-					//const wchar_t NumName[4][2] = {_T("一"), _T("二"), _T("三"), _T("四")};
-					//const int ActionDefine[4] = {};
 					int ActionNo = -1;
 					switch (SpecialAction.ActionType)
 					{
@@ -674,6 +669,7 @@ void CMahjongSpiritDlg::OnPaint()
 			}
 			break;
 		case CMahjongSpiritDlg::ShowMatchInfo:
+			// 显示当前局数
 			{
 				CImage BackImage;
 				CreateDefaultCutScenesImage(BackImage, 4, dlg_width, dlg_height);
@@ -682,7 +678,6 @@ void CMahjongSpiritDlg::OnPaint()
 				if (CutRate >= 96) LoadRate = (CutRate - 96) / 4.0;
 				POINT ShowPos = {0, dlg_height / 2 - 100};
 				ShowCutScenes(hdc, BackImage, dlg_width, dlg_height, ShowPos, LoadRate, 0);
-				//ShowCutScenes(hdc, CutScenesDirection, CutRate, dlg_width, dlg_height);
 				if (CutRate > 4 && CutRate < 96)
 				{
 					CString MatchInfoText; 
@@ -690,7 +685,6 @@ void CMahjongSpiritDlg::OnPaint()
 					const wchar_t NumName[10][2] = {_T("一"), _T("二"), _T("三"), _T("四"), _T("五"), _T("六"), _T("七"), _T("八"), _T("九"), _T("十")};
 			
 					MatchInfoText.Format(_T("%s%s局"), MatchWindName[match_info.match_wind], NumName[match_info.game_num]);
-					//MatchInfoText.Append(_T("局"));
 					COLORREF TextColor = RGB(75, 75, 128);
 					if ((CutRate > 40 && CutRate < 60) && (CutRate / 4) % 2 == 0) TextColor = RGB(0, 0, 0);
 					POINT MainShowPos = {500, 300}, ExtraShowPos = {700, 330};
@@ -709,10 +703,10 @@ void CMahjongSpiritDlg::OnPaint()
 					}
 
 				}
-				//BackImage.Destroy();
 			}
 			break;
 		case CMahjongSpiritDlg::ShowPointsChange:
+			// 显示分数变化过程
 			{
 				static int* pChangePoints = nullptr;
 				static int* pOriginPoints = nullptr;
@@ -796,6 +790,27 @@ void CMahjongSpiritDlg::OnPaint()
 				}
 			}
 			break;
+		case CMahjongSpiritDlg::ShowMatchEnd:
+			// 显示结算的过场动画
+			{
+				CImage BackImage;
+				CreateDefaultCutScenesImage(BackImage, 4, dlg_width, dlg_height);
+				double LoadRate = 0;
+				if (CutRate <= 4) LoadRate = (CutRate - 4) / 4.0;
+				if (CutRate >= 96) LoadRate = (CutRate - 96) / 4.0;
+				POINT ShowPos = {0, dlg_height / 2 - 100};
+				ShowCutScenes(hdc, BackImage, dlg_width, dlg_height, ShowPos, LoadRate, 0);
+				if (CutRate > 4 && CutRate < 96)
+				{
+					CString EndText = L"牌局结束，开始结算"; 
+			
+					COLORREF TextColor = RGB(75, 75, 128);
+					if ((CutRate > 40 && CutRate < 60) && (CutRate / 4) % 2 == 0) TextColor = RGB(0, 0, 0);
+					POINT MainShowPos = {500, 300}, ExtraShowPos = {700, 330};
+					ShowTransparentText(hdc, EndText, _T("楷体"), 60, TextColor, MainShowPos, 100);
+				}
+			}
+			break;
 		default:
 			break;
 		}
@@ -820,6 +835,58 @@ void CMahjongSpiritDlg::OnPaint()
 		ShowHintBox(hdc, PointColorBox, 280, 65, 0);
 		TextOutW(hdc, PointColorBox.x + 10, PointColorBox.y + 10, PointColorString, lstrlenW(PointColorString));
 		DeleteObject(hf);
+	}
+	if (IfShowMarks)
+	{
+		HFONT hf = CreateMyFont(_T("华文中宋"), 24);
+		SelectObject(hdc, hf);
+		HPEN hp = CreatePen(PS_DASH, 2, RGB(255, 255, 255));
+		SelectObject(hdc, hp);
+		SetBkMode(hdc, TRANSPARENT);
+		SetTextColor(hdc, RGB(255, 255, 255));
+		TEXTMETRIC tm;
+		GetTextMetricsW(hdc, &tm);
+		POINT MarksBoxPos = {MarksBoxSize.left, MarksBoxSize.top};
+		ShowHintBox(hdc, MarksBoxPos, MarksBoxSize.right - MarksBoxSize.left, MarksBoxSize.bottom - MarksBoxSize.top, 0, 200);
+		
+		int WhiteLineY = 200;
+		int LeftRightBlank = 50;
+		MoveToEx(hdc, MarksBoxSize.left + LeftRightBlank, WhiteLineY, NULL);
+		LineTo(hdc, MarksBoxSize.right - LeftRightBlank, WhiteLineY);
+		int BlankWidth = MarksBoxSize.right - MarksBoxSize.left - 2 * LeftRightBlank;
+		for (int i = 0; i < 4; i ++)
+		{
+			CString NameString = AllRobot[i].GetRobotName();
+			RECT NameStringRect = {MarksBoxSize.left + LeftRightBlank + i * BlankWidth / 4, MarksBoxSize.top + 30,
+				MarksBoxSize.left + LeftRightBlank + (i + 1) * BlankWidth / 4, WhiteLineY};
+			DrawTextW(hdc, NameString, lstrlenW(NameString), &NameStringRect, DT_TOP | DT_CENTER);
+		}
+		DeleteObject(hf);
+		SelectObject(hdc, hf);
+		hf = CreateMyFont(_T("Times New Roman"), 24);
+		for (int i = 0; i < MatchNum; i++)
+		{
+			
+			for (int j = 0; j < 4; j++)
+			{
+				char MarksSign;
+				if (Marks[i][j] > 0)
+					MarksSign = '+';
+				else if (Marks[i][j] < 0)
+					MarksSign = '-';
+				else
+					MarksSign = '±';
+				CString ThisMarksString = L"";
+				ThisMarksString.Format(_T("%c%d"), MarksSign, abs(Marks[i][j]));
+				RECT MarksStringRect = {MarksBoxSize.left + LeftRightBlank + j * BlankWidth / 4, 
+										WhiteLineY + (i + 1) * tm.tmHeight, 
+										MarksBoxSize.left + LeftRightBlank + (j + 1) * BlankWidth / 4, 
+										WhiteLineY + (i + 2) * tm.tmHeight};
+				DrawTextW(hdc, ThisMarksString, lstrlenW(ThisMarksString), &MarksStringRect, DT_TOP | DT_CENTER);
+			}
+		}
+		DeleteObject(hf);
+		DeleteObject(hp);
 	}
 
 	//将内存中的图拷贝到屏幕上进行显示
@@ -1018,7 +1085,6 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 				static bool choose_completed = false;		//选择是否结束
 				static bool SetRiichi = false;				//是否已经设置好立直
 				static bool tenpai_analysis = false;		//是否完成听牌分析
-				static bool RobotInfoInitialize = false;
 
 				if (!RobotInfoInitialize)
 				{
@@ -1026,7 +1092,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 					const CString RobotName[4] = {_T("极地严寒"), _T("电脑一号"), _T("电脑二号"), _T("电脑三号")};
 					for (int i = 0; i < 4; i++) 
 					{
-						robot[i].SetPoints(25000);
+						robot[i].SetPoints(OriginPoints);
 						robot[i].SetRobotName(RobotName[i]);
 					}
 					RobotInfoInitialize = true;
@@ -1050,9 +1116,70 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 					{
 						match_info.thisdealer_num = 0;
 						match_info.this_dealer = direction((match_info.this_dealer + 1) % 4);
-						match_info.game_num = (match_info.game_num + 1) % 4;
+						match_info.game_num ++;
 					}
+					// 判断负分
+					bool NegativePointsFlag = false;
+					if (NegativeEnd)
+					{
+						for (int i = 0; i < 4; i++)
+							if (AllRobot[i].GetPoints() < 0)
+							{
+								NegativePointsFlag = true;
+								break;
+							}
+					}
+					// 场风更替，或者结束
+					if (match_info.game_num >= 4 || NegativePointsFlag)
+					{
+						match_info.game_num = 0;
+							
+						if ((MatchFormat == 1 && match_info.match_wind == east)
+							|| (MatchFormat == 2 && match_info.match_wind == south)
+							|| (MatchFormat == 3 && match_info.match_wind == north))
+						{
+							match_info.match_wind = east;
+							RobotInfoInitialize = false;
+							int Ranks[4] = {0, 1, 2, 3};
+							int AllPoints[4];
+							for (int i = 0; i < 4; i++)
+							{
+								AllPoints[i] = AllRobot[i].GetPoints();
+								float FixedMarks;
+								if (TopBonus)
+									FixedMarks = (AllPoints[i] - BackPoints) / 1000.0;
+								else
+									FixedMarks = (AllPoints[i] - OriginPoints) / 1000.0;
+								if (ceil(FixedMarks) - FixedMarks < 0.5)  Marks[MatchNum][i] = ceil(FixedMarks);
+								else Marks[MatchNum][i] = floor(FixedMarks);
+							}
+							for (int i = 3; i >= 0; i--)
+								for (int j = 0; j < i; j++)
+									if (AllPoints[j] > AllPoints[j + 1])
+									{
+										int TempInt = AllPoints[j + 1];
+										AllPoints[j + 1] = AllPoints[j];
+										AllPoints[j] = TempInt;
+										TempInt = Ranks[j + 1];
+										Ranks[j + 1] = Ranks[j];
+										Ranks[j] = TempInt;
+									}
+							int RankHorseMarks[4] = {-RankHorse_1, -RankHorse_2, RankHorse_2, RankHorse_1};
+							for (int i = 0; i < 4; i++)
+								Marks[MatchNum][Ranks[i]] += RankHorseMarks[i];
+							if (TopBonus)
+								Marks[MatchNum][Ranks[3]] += (BackPoints - OriginPoints) / 1000 * 4;
+							match_info.frame_status = FRAME_NORMAL;
 
+							MatchNum = (MatchNum + 1) % 10;
+							CutScenesType = ShowMatchEnd;
+							SetTimer(7, 10, NULL);
+							break;
+						}
+						if (MatchFormat != 0)
+							match_info.match_wind = direction(match_info.match_wind + 1);
+					}
+						
 					// 重置余牌
 					for (int type_num = 0; type_num < 37; type_num ++)
 						if (type_num % 10 != 9)
@@ -1093,15 +1220,21 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 					tempmypai.reset_all();
 					Choosing = false;
 			
+					ChooseFlags = 0x0;
+					
+					win = false;
+					Chi = false;
+					Pon = false;
+					Kan = false;
 					mopai = true;
-					tileout = false;
 					analysis_begin = false;
 					arrange_completed = false;
 					mopai_completed = false;
+					tileout = false;
 					choose_completed = false;
-					ChooseFlags = 0x0;
 					SetRiichi = false;				//是否已经设置好立直
-					win = false;
+					tenpai_analysis = false;		//是否完成听牌分析
+
 					HuFlags = 0x0;
 					analysis_completed = false;
 					get_all_tiles = false;
@@ -1119,9 +1252,11 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 					WinPaiStatus = PAI_STATUS_NORMAL;
 					CutScenesType = ShowMatchInfo;
 					SetTimer(7, 10, NULL);
-					//SetTimer(5, 250, NULL);
 					break;
 				}
+
+				
+
 				if (!get_all_tiles)
 				{
 					static int LastShowTilenum = -1;
@@ -2002,7 +2137,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 											PossibleKanSum = 0;
 											match_info.kansum ++;
 											robot[0].add_paistatus(PAI_STATUS_RINSHAN);
-											if (FinalPlusKanFuluIndex != -1 || FinalKanTile.type == 3)
+											if (FinalPlusKanFuluIndex != -1 || ((FinalKanTile.type == 3 || FinalKanTile.num == 0 || FinalKanTile.num == 8) && ChanAnKan))
 											{
 												match_info.chankan_possible = true;
 												match_info.active_tile = FinalKanTile;
@@ -2208,7 +2343,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								{
 									bool PlusKan = robot[match_info.active_direction].get_pai().get_tilenum(MyResponse.keytile) != 4;
 									robot[match_info.active_direction].act(match_info);
-									if (PlusKan || MyResponse.keytile.type == 3)
+									if (PlusKan || ((MyResponse.keytile.type == 3 || MyResponse.keytile.num == 0 || MyResponse.keytile.num == 8) && ChanAnKan))
 									{
 										match_info.chankan_possible = true;
 										tileout = true;
@@ -2281,7 +2416,11 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 			{
 				KillTimer(7);
 				if (CutScenesType == ShowMatchInfo) SetTimer(5, 250, NULL);
-				if (CutScenesType != ShowPointsChange) SetTimer(6, 50, NULL);
+				if (CutScenesType == ShowMatchEnd) 
+				{
+					IfShowMarks = true;
+				}
+				if (CutScenesType != ShowPointsChange && CutScenesType != ShowMatchEnd) SetTimer(6, 50, NULL);
 				CutRate = 0;
 				IfShowCutScenes = false;
 				CutScenesType = ScenesEnd;
@@ -2310,9 +2449,12 @@ void CMahjongSpiritDlg::OnMouseMove(UINT nFlags, CPoint point)
 	if (DrawMode)
 	{
 		MousePoint = point;
-
 		RECT tempRect = {450, 275, 730, 440};
 		InvalidateRect(&tempRect, false);
+	}
+	else if (IfShowMarks)
+	{
+		InvalidateRect(&MarksBoxSize, false);
 	}
 	else if (mahjong_start && get_all_tiles)
 	{
@@ -2375,7 +2517,16 @@ void CMahjongSpiritDlg::OnLButtonDown(UINT nFlags, CPoint point)
 		RECT tempRect = {450, 275, 730, 440};
 		InvalidateRect(&tempRect, false);
 	}
-	else 
+	else if (IfShowMarks)
+	{
+		if (CutScenesType == ScenesEnd)
+		{	
+			SetTimer(6, 50, NULL);
+		}
+		IfShowMarks = false;
+		InvalidateRect(NULL, false);
+	}
+	else
 	{
 		if (mahjong_start && match_info.frame_status == FRAME_NORMAL && get_all_tiles && CutScenesType == None)
 		{
@@ -2508,22 +2659,25 @@ void CMahjongSpiritDlg::OnBnClickedChangeVisible()
 
 void CMahjongSpiritDlg::OnBnClickedButtonForesee()
 {
-	OneRoundForesee = !OneRoundForesee;
 	// TODO: 在此添加控件通知处理程序代码
+	// 一巡先知模式：Ctrl + F
+	OneRoundForesee = !OneRoundForesee;
 }
 
 
 void CMahjongSpiritDlg::OnBnClickedButtonManaged()
 {
-	MeAutoMode = !MeAutoMode;
 	// TODO: 在此添加控件通知处理程序代码
+	// 代打模式：Ctrl + M
+	MeAutoMode = !MeAutoMode;
 }
 
 
 void CMahjongSpiritDlg::OnBnClickedButtonDrawmode()
 {
-	DrawMode = !DrawMode;
 	// TODO: 在此添加控件通知处理程序代码
+	// 画图模式：Ctrl + D
+	DrawMode = !DrawMode;
 }
 
 
@@ -2531,10 +2685,15 @@ void CMahjongSpiritDlg::OnGamesettingRules()
 {
 	// TODO: 在此添加命令处理程序代码
 	if (!pRulesSettingsDlg) pRulesSettingsDlg = new CRulesSettingsDlg;
+
+	UpdateRules(true);
+	
 	INT_PTR nResponse = pRulesSettingsDlg->DoModal();
 	if (nResponse == IDOK)
 	{
-		
+		UpdateRules(false);
+		OnGamesettingReset();
+		MatchNum = 0;
 	}
 }
 
@@ -2542,10 +2701,54 @@ void CMahjongSpiritDlg::OnGamesettingRules()
 void CMahjongSpiritDlg::OnGamesettingMarks()
 {
 	// TODO: 在此添加命令处理程序代码
+	IfShowMarks = !IfShowMarks;
 }
 
 
 void CMahjongSpiritDlg::OnGamesettingReset()
 {
 	// TODO: 在此添加命令处理程序代码
+	KillTimer(6);
+	tile_selected = -1;
+	tile_out = -1;
+	match_info.frame_status = 0;
+	match_info.match_wind = east;
+	match_info.game_num = 0;
+	match_info.round = 0;
+	match_info.thisdealer_num = 0;
+	match_info.RiichiBarSum = 0;
+	match_info.tenhou_possible = true;
+	match_info.this_dealer = direction(rand() % 4);
+	match_info.win_direction = none;
+
+	RobotInfoInitialize = false;
+	frame_start = true;
+	IfShowChooseColumn = false;
+	IfShowChiFuluHint = false;
+	IfShowTenpaiHint = false;
+	IfShowMarks = false;
+	MousePoint.x = MousePoint.y = 0;
+	CutScenesType = None;
+	SetTimer(1, 100, NULL);
+}
+
+
+void CMahjongSpiritDlg::UpdateRules(bool FromMain)
+{
+	void* MainData[] = {&MatchFormat, &TopBonus, &OriginPoints, &RankHorse_1, &RankHorse_2, &BackPoints,
+	&NineOrphans, &ChanAnKan, &match_info.DoubleWindTile, &OpenQuadRenShan, &DrawMangan, &NegativeEnd};
+	void* SettingDlgData[] = {
+		&pRulesSettingsDlg->MatchFormat, &pRulesSettingsDlg->TopBonus, &pRulesSettingsDlg->OriginPoints, 
+		&pRulesSettingsDlg->RankHorse_1, &pRulesSettingsDlg->RankHorse_2, &pRulesSettingsDlg->BackMarks,
+		&pRulesSettingsDlg->NineOrphans, &pRulesSettingsDlg->ChanAnKan, &pRulesSettingsDlg->DoubleWindTile, 
+		&pRulesSettingsDlg->OpenQuadRenShan, &pRulesSettingsDlg->DrawMangan, &pRulesSettingsDlg->NegativeEnd
+	};
+	int DataSize[] = {1, 1, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1};
+	int DataNum = sizeof(SettingDlgData) / sizeof(void*);
+	if (FromMain)
+		for (int i = 0; i < DataNum; i++)
+			memcpy(SettingDlgData[i], MainData[i], DataSize[i]);
+	else
+		for (int i = 0; i < DataNum; i++)
+			memcpy(MainData[i], SettingDlgData[i], DataSize[i]);
 }
