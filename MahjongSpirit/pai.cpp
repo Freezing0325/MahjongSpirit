@@ -1516,6 +1516,13 @@ hupaiinfo pai::ifhu(singletile lasttile, bool test, UINT nFlags, matchinfo match
 		strcat_s(result.fanzhong, strlen(result.fanzhong) + 8, "十三幺 ");
 		if (!test)
 		{
+			if (tenhou)
+			{
+				if (self_direction == match_info.this_dealer)
+					strcat_s(result.fanzhong, strlen(result.fanzhong) + 6, "天和 ");
+				else
+					strcat_s(result.fanzhong, strlen(result.fanzhong) + 6, "地和 ");
+			}
 			memset(result.hutype, '\0', 30);
 			strcpy_s(result.hutype, 6, "役满 ");
 			result.fanshu = 13;

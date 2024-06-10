@@ -20,7 +20,7 @@
 //20230717_0053£º½â¾öÁËÀï±¦ÅÆÉÁÏÖµÄÎÊÌâ£¬´ú´òÊ±ÎÞ·¨Õý³£Á¢Ö±µÄÎÊÌâ£¬°Ñ×ÀÃæÍ¼Æ¬¸Ä³É´úÂë»æÍ¼£¬Ôö¼ÓÁË»æÍ¼¸¨ÖúÄ£Ê½£¬Ôö¼ÓÁËÍæ¼ÒÃûºÍ·ÖÊýµÄÏÔÊ¾£¬´óÖÂÐ´ÁË·ÖÊý¸ü¸ÄµÄ¿ò¼Ü£¬¾ßÌåÃ»ÊµÏÖ
 //20240609_2157£º½â¾öÁË´ú´òÄ£Ê½ÖÐÑ¡Ôñ³ö´íµÄÎÊÌâ£¬½â¾öÁË·ÖÎö×Ô¼ºÅÆÊ±Óöµ½¿ª¸Ü»á¿¨×¡µÄÎÊÌâ£¬½â¾öÁË¶Ô×Ô¼ºÅÆ·ÖÎöÊ±»áÖØ¸´¼ÆËãÐÂÃþÅÆµÄÎÊÌâ¡£µ«ÊÇ·¢ÏÖÒ»¸öÎÊÌâ£ºÓÐµÄÊ±ºò¿ÉÄÜÐèÒª¿ÌÒâ²ðµô°µ¸Ü¶ø²»¿ª¸Ü£¬Õâ¸öÊ±ºò»úÆ÷ÈË»áÖ±½Ó¿ª¸Ü¡£×Ô¼ºµÄ´ú´òºÍ½¨ÒéÏµÍ³Ò²²»Í³Ò»¡£
 //20240610_1752£ºÊµÏÖÁËÅÆ¾ÖµÄ½áÊøÓëÖØÖÃ£¬ÊµÏÖÁË¼Æ·Ö£¬ÊµÏÖÁË´ó²¿·Ö¹æÔò£¬µ«ÊÇ¾ÖÄ©Ê±ÓÐÊ±ºò»á³öÏÖ³öºÚÅÆ£¬»úÖÆ²»Ã÷¡£¾ÅÖÖ¾ÅÅÆÁ÷¾Ö¡¢´óÃ÷¸Ü°üÅÆÒÔ¼°Á÷¾ÖÂú¹áÉÐÎ´ÊµÏÖ¡£
-
+//20240610_2307£ºÊµÏÖÁË¾ÅÖÖ¾ÅÅÆÁ÷¾ÖºÍÁ÷¾ÖÂú¹á£¬ÐÞ¸´ÁËÒ»Ð©BUG¡£Ê¤Àû¾ÍÔÚÑÛÇ°¡£
 
 #include "stdafx.h"
 
@@ -57,6 +57,10 @@ char fanzhong_sub1[][11] = {"Ò»ÆøÍ¨¹á", "»ìÈ«´øçÛ¾Å", "ÈýÉ«Í¬Ë³", "»ìÒ»É«", "´¿È
 char playername[][20] = {"¼«µØÑÏº®", "µçÄÔÒ»ºÅ", "µçÄÔ¶þºÅ", "µçÄÔÈýºÅ"};
 
 const singletile defaulttile(-1, -1);
+const singletile ThirteenOrphans[] = {singletile(0, 0), singletile(0, 8), singletile(1, 0), singletile(1, 8), singletile(2, 0), singletile(2, 8),
+										singletile(3, 0), singletile(3, 1), singletile(3, 2), singletile(3, 3), singletile(3, 4), singletile(3, 5), singletile(3, 6)};
+const singletile NineGates[] = {singletile(0, 0), singletile(0, 0), singletile(0, 0), singletile(0, 1), singletile(0, 2), singletile(0, 3), singletile(0, 4),
+								singletile(0, 5), singletile(0, 6), singletile(0, 7), singletile(0, 8), singletile(0, 8), singletile(0, 8)};
 const fuluinfo menqianqing = fuluinfo();
 const fuluinfo yakupaiexample = fuluinfo(1, &fulugroup(ke, 3, 4));
 const fulugroup YakupaiFulu = fulugroup(ke, 3, 4);
@@ -89,6 +93,8 @@ CMahjongSpiritDlg::CMahjongSpiritDlg(CWnd* pParent /*=NULL*/)
 	, pRulesSettingsDlg(nullptr)
 	, RobotInfoInitialize(false)
 	, MatchNum(0)
+	, MyTiles(nullptr)
+	, AllOrphans(false)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	m_pPicture = NULL;
@@ -177,7 +183,7 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	DrawMode = false;
 
 	ThisSeed = (unsigned int)time(NULL);
-	//ThisSeed = 1717925798;
+	//ThisSeed = 1689442464;
 	/*
 	Ò»Ð©ÖÖ×Ó£º
 	1689440075£º¿ª¾Ö»áÓÐºÜ¶àÅöÅÆ
@@ -192,7 +198,7 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	OnGamesettingReset();
 	AllRobot = nullptr;
 	pHupaiInfo = nullptr;
-
+	//MyTiles = ThirteenOrphans; // NineGates;
 	return TRUE;  // ³ý·Ç½«½¹µãÉèÖÃµ½¿Ø¼þ£¬·ñÔò·µ»Ø TRUE
 }
 
@@ -485,8 +491,9 @@ void CMahjongSpiritDlg::OnPaint()
 						mypai[seat].print_river(hdc, paihe_pos[seat], seat);
 					}
 				}
-				else
+				else 
 				{
+					bool PrintNewTile = (match_info.frame_status == FRAME_NORMAL || FRAME_DRAW_NINE_ORPHANS || (match_info.frame_status == FRAME_WIN && match_info.active_direction == match_info.win_direction));
 					direction NewTileDirection = match_info.active_direction;
 					bool NewTile_visible = PaiVisible[NewTileDirection];
 					POINT NewTile_pos = pai_pos[NewTileDirection];
@@ -509,18 +516,16 @@ void CMahjongSpiritDlg::OnPaint()
 					}
 					if (match_info.frame_status != FRAME_NORMAL)
 					{
-						/*if(match_info.active_direction != match_info.win_direction)
-							NewTile.reset_all();*/
 						NewTile.remove_tile_status(TILE_RECOMMEND);
 					}
-					if (match_info.active_direction != north)
+					if (match_info.active_direction != north && PrintNewTile)
 						NewTile.print_tiles(hdc, NewTile_pos, NewTileDirection, NewTile_visible, tile_selected - mypai[0].get_tilesum());
 					for (int seat = 0; seat < 4; seat++)
 					{
 						mypai[seat].print_tiles(hdc, pai_pos[seat], seat, PaiVisible[seat]/*seat != 0*/, tile_selected);
 						mypai[seat].print_river(hdc, paihe_pos[seat], seat);
 					}
-					if (match_info.active_direction == north)
+					if (match_info.active_direction == north && PrintNewTile)
 						NewTile.print_tiles(hdc, NewTile_pos, NewTileDirection, NewTile_visible, tile_selected - mypai[0].get_tilesum());
 				}
 				if (IfShowChiFuluHint)
@@ -557,6 +562,11 @@ void CMahjongSpiritDlg::OnPaint()
 						hint_info = _T("Á÷¾Ö£¡");
 						if (!AllVisible) for (int seat = 0; seat < 4; PaiVisible[seat++] = mypai[seat].iftingpai());
 					}
+					else if (match_info.frame_status == FRAME_DRAW_MANGAN)
+					{
+						hint_info = _T("Á÷¾ÖÂú¹á£¡");
+
+					}
 					else
 					{
 					// »ñÈ¡ºÍÅÆµÄÐÅÏ¢
@@ -568,7 +578,7 @@ void CMahjongSpiritDlg::OnPaint()
 							HuFlags |= HU_RIICHI * ((WinPaiStatus & PAI_STATUS_RIICHI) != 0);
 							HuFlags |= HU_WRIICHI * ((WinPaiStatus & PAI_STATUS_WRIICHI) != 0);
 							HuFlags |= HU_IPPATSU * ((WinPaiStatus & PAI_STATUS_IPPATSU) != 0);
-							HuFlags |= HU_TENHOU * match_info.tenhou_possible;
+							HuFlags |= HU_TENHOU * (match_info.tenhou_possible && match_info.win_direction == match_info.active_direction);
 							HuFlags |= HU_RINSHAN * ((WinPaiStatus & PAI_STATUS_RINSHAN) != 0);
 							HuFlags |= HU_HAITEI * (remaintiles.get_tilesum() == 4);
 							HuFlags |= HU_CHANKAN * match_info.chankan_possible;
@@ -609,7 +619,7 @@ void CMahjongSpiritDlg::OnPaint()
 					hintbox_pos.x = 600;
 					hintbox_pos.y = 80;
 					RECT hintinfo_rect = {620, 100, 620 + 7 * tm.tmMaxCharWidth, 100 + tm.tmHeight * hint_info_lines};
-					ShowHintBox(hdc, hintbox_pos, 8 * tm.tmMaxCharWidth, tm.tmHeight * hint_info_lines + 40, 0);
+					ShowHintBox(hdc, hintbox_pos, 8 * tm.tmMaxCharWidth, tm.tmHeight * hint_info_lines + 40, 0, 200);
 					DrawTextW(hdc, hint_info, lstrlenW(hint_info), &hintinfo_rect, DT_TOP | DT_RIGHT);
 					//TextOut(hdc, hintinfo_pos.x, hintinfo_pos.y, hint_info, lstrlenW(hint_info));
 					DeleteObject(hf);
@@ -634,7 +644,7 @@ void CMahjongSpiritDlg::OnPaint()
 				if (CutRate > 4 && CutRate < 96)
 				{
 					CString ActionInfoText; 
-					const wchar_t ActionName[6][3] = {_T("³Ô"), _T("Åö"), _T("¸Ü"), _T("Á¢Ö±"), _T("ºÍ"), _T("×ÔÃþ")};
+					const wchar_t ActionName[][3] = {_T("³Ô"), _T("Åö"), _T("¸Ü"), _T("Á¢Ö±"), _T("ºÍ"), _T("×ÔÃþ"), _T("Á÷¾Ö")};
 					int ActionNo = -1;
 					switch (SpecialAction.ActionType)
 					{
@@ -656,6 +666,9 @@ void CMahjongSpiritDlg::OnPaint()
 					case RESPONSE_WIN:
 						if (SpecialAction.ActionDirection == match_info.active_direction) ActionNo = 5;
 						else ActionNo = 4;
+						break;
+					case RESPONSE_NINE_ORPHANS_DRAW:
+						ActionNo = 6;
 						break;
 					default:
 						break;
@@ -715,7 +728,7 @@ void CMahjongSpiritDlg::OnPaint()
 					pOriginPoints = new int[4];
 					pChangePoints = new int[4];
 					for (int i = 0; i < 4; i++) pChangePoints[i] = 0;
-					if (match_info.win_direction != noneed)
+					if (match_info.win_direction != noneed && match_info.frame_status == FRAME_WIN)
 					{
 						getpointinfo AllGetPointInfo = pHupaiInfo->getpoint();
 						if (match_info.active_direction == match_info.win_direction) // ×ÔÃþ
@@ -772,6 +785,21 @@ void CMahjongSpiritDlg::OnPaint()
 						{
 							int TenPaiGetPoints = 3000 / TenPaiSum, NoTenLosePoints = -3000 / (4 - TenPaiSum);
 							for (int i = 0; i < 4; i++) pChangePoints[i] = IfTenPai[i] ? TenPaiGetPoints : NoTenLosePoints;
+						}
+					}
+					else if (match_info.frame_status == FRAME_DRAW_MANGAN)
+					{
+						if (match_info.this_dealer == match_info.win_direction)
+						{
+							for (int i = 0; i < 4; i++)
+								pChangePoints[i] = -4000;
+							pChangePoints[match_info.win_direction] = 12000;
+						}
+						else
+						{
+							for (int i = 0; i < 4; i++)
+								pChangePoints[i] = i == match_info.this_dealer ? -4000 : -2000;
+							pChangePoints[match_info.win_direction] = 8000;
 						}
 					}
 					for (int i = 0; i < 4; i++) pOriginPoints[i] = AllRobot[i].GetPoints();
@@ -939,7 +967,7 @@ UINT GetMyResponseThreadProc(LPVOID pParam)
 		if (ChoiceByte == 0)
 			tempDlg->FinalChoice = -1;
 		else
-			for (int Choice = CHOOSE_HU; Choice >= ChoiceByte; Choice >>= 1)
+			for (int Choice = CHOOSE_DRAW; Choice >= ChoiceByte; Choice >>= 1)
 				tempDlg->FinalChoice += ((Choice & tempDlg->ChooseFlags) != 0);
 	}
 	tempDlg->Invalidate(false);
@@ -1076,6 +1104,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 				static bool Chi = false;
 				static bool Pon = false;
 				static bool Kan = false;
+				static bool NineOrphansDraw = false;
 				static bool mopai = true;					//ÊÇ·ñ´¦ÓÚÃþÅÆ×´Ì¬
 				static bool analysis_begin = false;			//ÊÇ·ñÒÑ¾­¿ªÊ¼·ÖÎö³öÅÆ
 				static bool arrange_completed = false;		//×î³õµÄÀíÅÆÊÇ·ñ½áÊø
@@ -1085,6 +1114,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 				static bool choose_completed = false;		//Ñ¡ÔñÊÇ·ñ½áÊø
 				static bool SetRiichi = false;				//ÊÇ·ñÒÑ¾­ÉèÖÃºÃÁ¢Ö±
 				static bool tenpai_analysis = false;		//ÊÇ·ñÍê³ÉÌýÅÆ·ÖÎö
+				static bool AnalysisCompleted[3] = {false, false, false};
 
 				if (!RobotInfoInitialize)
 				{
@@ -1107,8 +1137,8 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 				if (frame_start)
 				{
 					// Èç¹û×¯¼ÒÉÏ¾Ö»ñÊ¤£¬»òÁ÷¾ÖºóÌýÅÆ£¬Ôò±¾³¡ÊýÔö¼Ó£»·ñÔòÂÖ×¯
-					if ((match_info.win_direction == match_info.this_dealer && match_info.frame_status > 0)
-						|| (match_info.win_direction == noneed && (remaintiles.get_tilesum() > 4 || mypai[match_info.this_dealer].iftingpai())))
+					if ((match_info.win_direction == match_info.this_dealer && match_info.frame_status == FRAME_WIN)
+						|| ((match_info.win_direction == noneed || match_info.frame_status == FRAME_DRAW_MANGAN) && (remaintiles.get_tilesum() > 4 || mypai[match_info.this_dealer].iftingpai())))
 					{
 						match_info.thisdealer_num ++;
 					}
@@ -1136,42 +1166,49 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 							
 						if ((MatchFormat == 1 && match_info.match_wind == east)
 							|| (MatchFormat == 2 && match_info.match_wind == south)
-							|| (MatchFormat == 3 && match_info.match_wind == north))
+							|| (MatchFormat == 3 && match_info.match_wind == north)
+							|| NegativePointsFlag)
 						{
 							match_info.match_wind = east;
-							RobotInfoInitialize = false;
-							int Ranks[4] = {0, 1, 2, 3};
-							int AllPoints[4];
-							for (int i = 0; i < 4; i++)
-							{
-								AllPoints[i] = AllRobot[i].GetPoints();
-								float FixedMarks;
-								if (TopBonus)
-									FixedMarks = (AllPoints[i] - BackPoints) / 1000.0;
-								else
-									FixedMarks = (AllPoints[i] - OriginPoints) / 1000.0;
-								if (ceil(FixedMarks) - FixedMarks < 0.5)  Marks[MatchNum][i] = ceil(FixedMarks);
-								else Marks[MatchNum][i] = floor(FixedMarks);
-							}
-							for (int i = 3; i >= 0; i--)
-								for (int j = 0; j < i; j++)
-									if (AllPoints[j] > AllPoints[j + 1])
-									{
-										int TempInt = AllPoints[j + 1];
-										AllPoints[j + 1] = AllPoints[j];
-										AllPoints[j] = TempInt;
-										TempInt = Ranks[j + 1];
-										Ranks[j + 1] = Ranks[j];
-										Ranks[j] = TempInt;
-									}
-							int RankHorseMarks[4] = {-RankHorse_1, -RankHorse_2, RankHorse_2, RankHorse_1};
-							for (int i = 0; i < 4; i++)
-								Marks[MatchNum][Ranks[i]] += RankHorseMarks[i];
-							if (TopBonus)
-								Marks[MatchNum][Ranks[3]] += (BackPoints - OriginPoints) / 1000 * 4;
+							match_info.thisdealer_num = 0;
 							match_info.frame_status = FRAME_NORMAL;
-
+							match_info.this_dealer = direction(rand() % 4);
+							RobotInfoInitialize = false;
+							tileout_completed = false;
+							// ¼ÆËãµÃ·Ö
+							{
+								int Ranks[4] = {0, 1, 2, 3};
+								int AllPoints[4];
+								for (int i = 0; i < 4; i++)
+								{
+									AllPoints[i] = AllRobot[i].GetPoints();
+									float FixedMarks;
+									if (TopBonus)
+										FixedMarks = (AllPoints[i] - BackPoints) / 1000.0;
+									else
+										FixedMarks = (AllPoints[i] - OriginPoints) / 1000.0;
+									if (ceil(FixedMarks) - FixedMarks < 0.5)  Marks[MatchNum][i] = ceil(FixedMarks);
+									else Marks[MatchNum][i] = floor(FixedMarks);
+								}
+								for (int i = 3; i >= 0; i--)
+									for (int j = 0; j < i; j++)
+										if (AllPoints[j] > AllPoints[j + 1])
+										{
+											int TempInt = AllPoints[j + 1];
+											AllPoints[j + 1] = AllPoints[j];
+											AllPoints[j] = TempInt;
+											TempInt = Ranks[j + 1];
+											Ranks[j + 1] = Ranks[j];
+											Ranks[j] = TempInt;
+										}
+								int RankHorseMarks[4] = {-RankHorse_1, -RankHorse_2, RankHorse_2, RankHorse_1};
+								for (int i = 0; i < 4; i++)
+									Marks[MatchNum][Ranks[i]] += RankHorseMarks[i];
+								if (TopBonus)
+									Marks[MatchNum][Ranks[3]] += (BackPoints - OriginPoints) / 1000 * 4;
+							}
 							MatchNum = (MatchNum + 1) % 10;
+							
 							CutScenesType = ShowMatchEnd;
 							SetTimer(7, 10, NULL);
 							break;
@@ -1192,10 +1229,12 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 					match_info.kansum = 0;
 					match_info.round = 0;
 					match_info.frame_status = FRAME_NORMAL;
-					match_info.active_direction = direction((match_info.this_dealer + 3) % 4);
+					match_info.active_direction = match_info.this_dealer;
 					match_info.active_tile = defaulttile;
 					match_info.chankan_possible = false;
 					match_info.tenhou_possible = true;
+
+					tileout_completed = false;
 
 					for (int havegettilenum = 0; havegettilenum < 10; havegettilenum++)
 					{
@@ -1219,13 +1258,13 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 					NewTile.remove_tile_status();
 					tempmypai.reset_all();
 					Choosing = false;
-			
 					ChooseFlags = 0x0;
 					
 					win = false;
 					Chi = false;
 					Pon = false;
 					Kan = false;
+					NineOrphansDraw = false;
 					mopai = true;
 					analysis_begin = false;
 					arrange_completed = false;
@@ -1234,6 +1273,10 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 					choose_completed = false;
 					SetRiichi = false;				//ÊÇ·ñÒÑ¾­ÉèÖÃºÃÁ¢Ö±
 					tenpai_analysis = false;		//ÊÇ·ñÍê³ÉÌýÅÆ·ÖÎö
+					for (int i = 0; i < 3; i++)
+					{
+						AnalysisCompleted[i] = false;
+					}
 
 					HuFlags = 0x0;
 					analysis_completed = false;
@@ -1254,8 +1297,6 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 					SetTimer(7, 10, NULL);
 					break;
 				}
-
-				
 
 				if (!get_all_tiles)
 				{
@@ -1279,7 +1320,16 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 						{
 							for (int seat = 0; seat < 4; seat ++)
 							{
-								addtile = remaintiles.get_randomtile();
+								if (seat != 0 || !MyTiles)
+									addtile = remaintiles.get_randomtile();
+								else
+								{
+									singletile SetTile = MyTiles[showtilenum - addtilenum + i];
+									if (remaintiles.get_tilenum(SetTile) == 0)
+										addtile = remaintiles.get_randomtile();
+									else
+										addtile = SetTile;
+								}
 								remaintiles.change_tilenum(addtile, -1);
 								mypai[seat].change_tilenum(addtile, 1);
 								if (seat == 0)
@@ -1301,7 +1351,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 				{
 					if (tileout_completed && CutScenesType == None)
 					{
-						static bool AnalysisCompleted[3];
+						
 						static robotresponse OtherResponse[3];
 						static direction PonDirection = noneed;
 						static bool RefreshMatchInfo = false;
@@ -1357,7 +1407,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 												ChooseFlags |= CHOOSE_CHI;
 											}
 										}
-										if (((MyPossibleResponse & POSSIBILITY_PON) != 0))
+										if (((MyPossibleResponse & POSSIBILITY_PON) != 0) && remaintiles.get_tilesum() > 4 )
 										{
 											Choosing = true;
 											ChooseFlags |= CHOOSE_PON;
@@ -1377,7 +1427,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								// ·ÖÎöÆäËüÍæ¼Ò
 								MyPossibleResponse = mypai[seat].get_possible_response(match_info, direction(seat));
 								// Ã»ÓÐ¿ÉÄÜµÄÑ¡Ôñ£¬ÔòÖ±½ÓÌø¹ý£¬½øÐÐÏÂÒ»¸ö·ÖÎö
-								if (MyPossibleResponse == POSSIBILITY_NULL)
+								if (MyPossibleResponse == POSSIBILITY_NULL || ((remaintiles.get_tilesum() == 4) && ((MyPossibleResponse & POSSIBILITY_RON) == 0)))
 								{
 									AnalysisCompleted[i] = true;
 									OtherResponse[i].response = RESPONSE_PASS;
@@ -1508,8 +1558,9 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								if (FinalChoice != -1)
 								{
 									SpecialAction.ActionDirection = MySeat;
-									bool* AllFlags[5] = {&Chi, &Pon, &Kan, &riichi, &win};
-									for (int i = 4, tmpChoiceNum = 0; i >= 0; i--)
+									bool* AllFlags[] = {&Chi, &Pon, &Kan, &riichi, &win, &NineOrphansDraw};
+									int ChoiseNum = sizeof(AllFlags) / sizeof(bool*);
+									for (int i = ChoiseNum - 1, tmpChoiceNum = 0; i >= 0; i--)
 									{
 										if (ChooseFlags & (1 << i))
 											tmpChoiceNum ++;
@@ -1519,6 +1570,11 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 											break;
 										}
 									}
+								}
+								if (NineOrphansDraw)
+								{
+									match_info.frame_status = FRAME_DRAW_NINE_ORPHANS;
+									SpecialAction.ActionType = RESPONSE_NINE_ORPHANS_DRAW;
 								}
 								if (win)
 								{
@@ -1552,8 +1608,42 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 							// Õý³£Á÷¾Ö
 							if (remaintiles.get_tilesum() <= 4)		
 							{
-								match_info.frame_status = FRAME_DRAW_NO_REMAINING;
-								match_info.win_direction = noneed;
+								bool DrawManganFlag = false;
+								direction DrawManganSeat = none;
+								if (DrawMangan)
+								{
+									for (int Seat = 0; Seat < 4; Seat ++)
+									{
+										paihe* pThisPaiHe = &AllRobot[Seat].get_pai().get_paihe();
+										if (pThisPaiHe->paihe_visiblesum == pThisPaiHe->paihesum)
+										{
+											DrawManganFlag = true;
+											for (int i = 0; i < pThisPaiHe->paihesum; i++)
+											{
+												if (pThisPaiHe->paihe_tile[i].num != 0 && pThisPaiHe->paihe_tile[i].num != 8 && pThisPaiHe->paihe_tile[i].type != 3)
+												{
+													DrawManganFlag = false;
+													break;
+												}
+											}
+										}
+										if (DrawManganFlag)
+										{
+											DrawManganSeat = direction(Seat);
+											break;
+										}
+									}
+								}
+								if (DrawManganFlag)
+								{
+									match_info.frame_status = FRAME_DRAW_MANGAN;
+									match_info.win_direction = DrawManganSeat;
+								}
+								else
+								{
+									match_info.frame_status = FRAME_DRAW_NO_REMAINING;
+									match_info.win_direction = noneed;
+								}
 								MakeRefresh = true;
 							}
 							// ËÄ¸ÜÁ÷¾Ö
@@ -1581,8 +1671,40 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								singletile gettile;
 								if (match_info.active_direction == MySeat)
 								{
+									
 									gettile = next_gettile;//remaintiles.get_randomtile();
 									next_gettile = remaintiles.get_randomtile();
+									// ËùÓÐÃþÅÆ¾ùÎªçÛ¾ÅÅÆ
+									
+									if (AllOrphans)
+									{
+										bool FindOrphans = false;
+										for (int i = 0; i < 7; i ++)
+											if (remaintiles.get_tilenum(3, i) > 0)
+											{
+												gettile = singletile(3, i);
+												FindOrphans = true;
+												break;
+											}
+										if (!FindOrphans)
+										{
+											for (int Type = 0; Type < 3; Type ++)
+											{
+												if (remaintiles.get_tilenum(Type, 0) > 0)
+												{
+													gettile = singletile(Type, 0);
+													FindOrphans = true;
+													break;
+												}
+												if (remaintiles.get_tilenum(Type, 8) > 0)
+												{
+													gettile = singletile(Type, 8);
+													FindOrphans = true;
+													break;
+												}
+											}
+										}
+									}
 									temptiles[2].reset_all();
 									temptiles[2].change_tilenum(next_gettile, 1);
 								}
@@ -1661,7 +1783,25 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 							}
 							if (match_info.active_direction == MySeat)
 							{
-								if(tempmypai.ifhu().ifhupai)
+								if (match_info.tenhou_possible && NineOrphans)
+								{
+									int OrphansTypeSum = 0;
+									for (int Type = 0; Type < 3; Type ++)
+									{
+										OrphansTypeSum += (tempmypai.get_tilenum(Type, 0) > 0);
+										OrphansTypeSum += (tempmypai.get_tilenum(Type, 8) > 0);
+									}
+									for (int Num = 0; Num < 7; Num ++)
+									{
+										OrphansTypeSum += (tempmypai.get_tilenum(3, Num) > 0);
+									}
+									if (OrphansTypeSum >= 9)
+									{
+										Choosing = true;
+										ChooseFlags |= CHOOSE_DRAW;
+									}
+								}
+								if (tempmypai.ifhu().ifhupai)
 								{
 									UINT TempHuFlags;
 									TempHuFlags |= HU_TSUMO;
@@ -1724,7 +1864,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 												KanFlag = true;
 										}
 									}
-									if (KanFlag)
+									if (KanFlag && remaintiles.get_tilesum() > 4)
 									{
 										Choosing = true;
 										ChooseFlags |= CHOOSE_KAN;
@@ -2265,7 +2405,8 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 						case RESPONSE_WIN:
 							WinPaiStatus = robot[SpecialAction.ActionDirection].get_paistatus();
 							PaiVisible[SpecialAction.ActionDirection] = true;
-							tempmypai = robot[SpecialAction.ActionDirection].get_pai();
+							if (SpecialAction.ActionDirection != MySeat) tempmypai = robot[SpecialAction.ActionDirection].get_pai();
+							else tempmypai = mypai[0];
 							if (match_info.active_direction != SpecialAction.ActionDirection) tempmypai.change_tilenum(match_info.active_tile, 1);
 							if (SpecialAction.ActionDirection != MySeat)
 							{
@@ -2278,6 +2419,12 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								tileout_completed = false;
 								if (match_info.chankan_possible) match_info.kansum --;
 							}
+							MakeRefresh = true;
+							break;
+						case RESPONSE_NINE_ORPHANS_DRAW:
+							PaiVisible[SpecialAction.ActionDirection] = true;
+							match_info.frame_status = FRAME_DRAW_NINE_ORPHANS;
+							tileout_completed = false;
 							MakeRefresh = true;
 							break;
 						case RESPONSE_RIICHI:
@@ -2587,7 +2734,12 @@ void CMahjongSpiritDlg::OnLButtonDown(UINT nFlags, CPoint point)
 		}
 		if (match_info.frame_status != FRAME_NORMAL)
 		{
-			if (CutScenesType == None)
+			if (match_info.frame_status == FRAME_DRAW_NINE_ORPHANS)
+			{
+				frame_start = true;
+				SetTimer(6, 50, NULL);
+			}
+			else if (CutScenesType == None)
 			{
 				CutScenesType = ShowPointsChange;
 				SetTimer(7, 5, NULL);
@@ -2711,6 +2863,7 @@ void CMahjongSpiritDlg::OnGamesettingReset()
 	KillTimer(6);
 	tile_selected = -1;
 	tile_out = -1;
+	tileout_completed = false;
 	match_info.frame_status = 0;
 	match_info.match_wind = east;
 	match_info.game_num = 0;
@@ -2721,6 +2874,7 @@ void CMahjongSpiritDlg::OnGamesettingReset()
 	match_info.this_dealer = direction(rand() % 4);
 	match_info.win_direction = none;
 
+	MatchNum = 0;
 	RobotInfoInitialize = false;
 	frame_start = true;
 	IfShowChooseColumn = false;

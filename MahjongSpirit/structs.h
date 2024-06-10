@@ -14,6 +14,7 @@
 #define RESPONSE_RIICHI 4
 #define RESPONSE_WIN 5
 #define RESPONSE_OUT 6
+#define RESPONSE_NINE_ORPHANS_DRAW 7
 #define RESPONSE_CHI_1 0x8
 #define RESPONSE_CHI_2 0x10
 #define RESPONSE_CHI_3 0x20
@@ -24,8 +25,9 @@
 #define FRAME_DRAW_NINE_ORPHANS 0x4
 #define FRAME_DRAW_FOUR_RIICHIS 0x8
 #define FRAME_DRAW_NO_REMAINING 0x10
-#define FRAME_DRAW 0x1F
-#define FRAME_WIN 0x20
+#define FRAME_DRAW_MANGAN 0x20
+#define FRAME_DRAW 0x3F
+#define FRAME_WIN 0x40
 
 enum grouptype {shun = 1, ke, kan, ankan};
 enum direction {east, south, west, north, noneed, none};

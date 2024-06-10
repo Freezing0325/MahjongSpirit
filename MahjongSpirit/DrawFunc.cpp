@@ -105,13 +105,14 @@ BOOL ChooseColumn(CImage& DestImage, UINT nFlags)
 	bool kan = nFlags & CHOOSE_KAN;
 	bool riichi = nFlags & CHOOSE_RIICHI;
 	bool hu = nFlags & CHOOSE_HU;
-	if (!chi && !pon && !kan && !riichi && !hu)
+	bool draw = nFlags & CHOOSE_DRAW;
+	if (!chi && !pon && !kan && !riichi && !hu && !draw)
 		return false;
 	if (!DestImage.IsNull())
 		DestImage.Destroy();
-	int ButtonNum = chi + pon + kan + riichi + hu;
-	bool ThisButtonValid[5] = {chi, pon, kan, riichi, hu};
-	CString ButtonText[5] = {_T(" 吃 "), _T(" 碰 "), _T(" 杠 "), _T("立直"), _T(" 和 ")};
+	int ButtonNum = chi + pon + kan + riichi + hu + draw;
+	bool ThisButtonValid[] = {chi, pon, kan, riichi, hu, draw};
+	CString ButtonText[] = {_T(" 吃 "), _T(" 碰 "), _T(" 杠 "), _T("立直"), _T(" 和 "), _T("流局")};
 	int DestWidth = CHOOSE_BUTTON_WIDTH * (4 + ButtonNum * 1.5);
 	DestImage.Create(DestWidth, CHOOSE_COLUMN_HEIGHT, 32);
 	HDC hDestDC = DestImage.GetDC();

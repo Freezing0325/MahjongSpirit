@@ -121,6 +121,8 @@ public:
 	bool MeAutoMode;			//托管模式
 	bool DebugMode;				//调试模式
 	bool DrawMode;				//画图模式
+	const singletile* MyTiles;	//初始配牌（调试用）
+	bool AllOrphans;			//是否全部摸幺九牌（调试用）
 	
 
 	bool IfShowChooseColumn;	//是否显示选择栏	
