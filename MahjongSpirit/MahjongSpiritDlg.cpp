@@ -21,6 +21,7 @@
 //20240609_2157：解决了代打模式中选择出错的问题，解决了分析自己牌时遇到开杠会卡住的问题，解决了对自己牌分析时会重复计算新摸牌的问题。但是发现一个问题：有的时候可能需要刻意拆掉暗杠而不开杠，这个时候机器人会直接开杠。自己的代打和建议系统也不统一。
 //20240610_1752：实现了牌局的结束与重置，实现了计分，实现了大部分规则，但是局末时有时候会出现出黑牌，机制不明。九种九牌流局、大明杠包牌以及流局满贯尚未实现。
 //20240610_2307：实现了九种九牌流局和流局满贯，修复了一些BUG。胜利就在眼前。
+//20240611_0221：实现了大明杠包牌的机制，所有规则均可实现。接下来进行实际测试。自己开暗杠与加杠没有动画显示，此前可能忘记搬运了。
 
 #include "stdafx.h"
 
@@ -61,6 +62,11 @@ const singletile ThirteenOrphans[] = {singletile(0, 0), singletile(0, 8), single
 										singletile(3, 0), singletile(3, 1), singletile(3, 2), singletile(3, 3), singletile(3, 4), singletile(3, 5), singletile(3, 6)};
 const singletile NineGates[] = {singletile(0, 0), singletile(0, 0), singletile(0, 0), singletile(0, 1), singletile(0, 2), singletile(0, 3), singletile(0, 4),
 								singletile(0, 5), singletile(0, 6), singletile(0, 7), singletile(0, 8), singletile(0, 8), singletile(0, 8)};
+const singletile RinShanTiles[] = {singletile(1, 0), singletile(1, 0), singletile(1, 0), singletile(1, 1), singletile(1, 1), singletile(1, 1), singletile(1, 1),
+								singletile(1, 2), singletile(1, 2), singletile(1, 2), singletile(1, 2), singletile(1, 3), singletile(1, 3)};
+const singletile RinShanTileGet[] = {singletile(1, 3), singletile(1, 4), singletile(1, 4)};
+int RinShanTileNum = 0;
+
 const fuluinfo menqianqing = fuluinfo();
 const fuluinfo yakupaiexample = fuluinfo(1, &fulugroup(ke, 3, 4));
 const fulugroup YakupaiFulu = fulugroup(ke, 3, 4);
@@ -183,7 +189,7 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	DrawMode = false;
 
 	ThisSeed = (unsigned int)time(NULL);
-	//ThisSeed = 1689442464;
+	ThisSeed = 1718041776;
 	/*
 	一些种子：
 	1689440075：开局会有很多碰牌
@@ -198,6 +204,7 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	OnGamesettingReset();
 	AllRobot = nullptr;
 	pHupaiInfo = nullptr;
+	MyTiles = RinShanTiles;
 	//MyTiles = ThirteenOrphans; // NineGates;
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -728,10 +735,11 @@ void CMahjongSpiritDlg::OnPaint()
 					pOriginPoints = new int[4];
 					pChangePoints = new int[4];
 					for (int i = 0; i < 4; i++) pChangePoints[i] = 0;
+					// 正常和牌
 					if (match_info.win_direction != noneed && match_info.frame_status == FRAME_WIN)
 					{
 						getpointinfo AllGetPointInfo = pHupaiInfo->getpoint();
-						if (match_info.active_direction == match_info.win_direction) // 自摸
+						if (match_info.active_direction == match_info.win_direction && !(match_info.OpenQuadRenShanFlag && match_info.OpenQuadRenShan)) // 自摸
 						{
 							pChangePoints[match_info.win_direction] = 1000 * match_info.RiichiBarSum;
 							match_info.RiichiBarSum = 0;
@@ -753,25 +761,46 @@ void CMahjongSpiritDlg::OnPaint()
 						}
 						else
 						{
-							if ((AllRobot[match_info.active_direction].get_paistatus() & PAI_STATUS_IPPATSU) != 0)
+							direction LoseDirection;
+							// 大明杠后最终岭上开花（中途可有连杠），则找到那个大明杠的来源作为输家包牌，若恰好立直则不予退还立直棒
+							if (match_info.OpenQuadRenShanFlag && match_info.OpenQuadRenShan)
 							{
-								match_info.RiichiBarSum --;
-								AllRobot[match_info.active_direction].ChangePoints(1000);
+								fuluinfo ThisFulu = AllRobot[match_info.win_direction].get_pai().get_fuluinfo();
+								int FuluSum = ThisFulu.groupsum;
+								for (int i = FuluSum - 1; i >= 0; i--)
+								{
+									fulugroup ThisFuluGroup = ThisFulu.allgroup[i];
+									if (ThisFuluGroup.thistype == kan && ThisFuluGroup.other_num != -1)
+									{
+										LoseDirection = direction((match_info.win_direction + ThisFuluGroup.seat_pos) % 4);
+										break;
+									}
+								}
+							}
+							else
+							{
+								LoseDirection = match_info.active_direction;
+								if ((AllRobot[LoseDirection].get_paistatus() & PAI_STATUS_IPPATSU) != 0)
+								{
+									match_info.RiichiBarSum --;
+									AllRobot[LoseDirection].ChangePoints(1000);
+								}
 							}
 							pChangePoints[match_info.win_direction] = 1000 * match_info.RiichiBarSum;
 							match_info.RiichiBarSum = 0;
 							if (match_info.this_dealer == match_info.win_direction)
 							{
-								pChangePoints[match_info.active_direction] = -AllGetPointInfo.ron_point_dealer;
+								pChangePoints[LoseDirection] = -AllGetPointInfo.ron_point_dealer;
 								pChangePoints[match_info.win_direction] += AllGetPointInfo.ron_point_dealer;
 							}
 							else
 							{
-								pChangePoints[match_info.active_direction] = -AllGetPointInfo.ron_point_normal;
+								pChangePoints[LoseDirection] = -AllGetPointInfo.ron_point_normal;
 								pChangePoints[match_info.win_direction] += AllGetPointInfo.ron_point_normal;
 							}
 						}
 					}
+					// 正常流局，根据听牌情况获得点数
 					else if (match_info.frame_status == FRAME_DRAW_NO_REMAINING)
 					{
 						bool IfTenPai[4];
@@ -787,6 +816,7 @@ void CMahjongSpiritDlg::OnPaint()
 							for (int i = 0; i < 4; i++) pChangePoints[i] = IfTenPai[i] ? TenPaiGetPoints : NoTenLosePoints;
 						}
 					}
+					// 流局满贯
 					else if (match_info.frame_status == FRAME_DRAW_MANGAN)
 					{
 						if (match_info.this_dealer == match_info.win_direction)
@@ -1259,6 +1289,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 					tempmypai.reset_all();
 					Choosing = false;
 					ChooseFlags = 0x0;
+					match_info.OpenQuadRenShanFlag = false;
 					
 					win = false;
 					Chi = false;
@@ -1349,6 +1380,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 				}
 				else
 				{
+					// 对其它人所打出的牌的反应
 					if (tileout_completed && CutScenesType == None)
 					{
 						
@@ -1480,7 +1512,8 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								else if (PonDirection != noneed) 
 								{
 									SpecialAction.ActionDirection = PonDirection;
-									SpecialAction.ActionType = RESPONSE_PON;
+									SpecialAction.ActionType = OtherResponse[(PonDirection + 3 - match_info.active_direction) % 4].response;
+									if (SpecialAction.ActionType == RESPONSE_KAN) match_info.OpenQuadRenShanFlag = true;
 									if ((OtherResponse[0].response & RESPONSE_CHI) != 0) robot[(match_info.active_direction + 1) % 4].abandon_response();
 									Chi = false;
 									ChooseFlags = 0x0;
@@ -1591,6 +1624,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								if (Kan && match_info.active_direction != MySeat)
 								{
 									SpecialAction.ActionType = RESPONSE_KAN;
+									match_info.OpenQuadRenShanFlag = true;
 									Kan = false;
 								}
 								if ((ChooseFlags & CHOOSE_HU) && !win)
@@ -1675,7 +1709,6 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 									gettile = next_gettile;//remaintiles.get_randomtile();
 									next_gettile = remaintiles.get_randomtile();
 									// 所有摸牌均为幺九牌
-									
 									if (AllOrphans)
 									{
 										bool FindOrphans = false;
@@ -1704,6 +1737,11 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 												}
 											}
 										}
+									}
+									if (match_info.OpenQuadRenShanFlag && MyTiles == RinShanTiles)
+									{
+										gettile = RinShanTileGet[RinShanTileNum++];
+										if (RinShanTileNum == 3) RinShanTileNum == 0;
 									}
 									temptiles[2].reset_all();
 									temptiles[2].change_tilenum(next_gettile, 1);
@@ -1928,6 +1966,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 										robot[match_info.active_direction].act(match_info);
 										mypai[match_info.active_direction] = robot[match_info.active_direction].get_pai();
 										tileout_completed = true;
+										match_info.OpenQuadRenShanFlag = false;
 										analysis_begin = false;
 										MakeRefresh = true;
 									}
@@ -2123,7 +2162,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 											Chi = false;
 										}
 									}			
-									// 开杠
+									// 开杠，仅包含暗杠与加杠
 									if (Kan)
 									{
 										static int PossibleKanSum = 0;
@@ -2199,7 +2238,10 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 														if (PossibleKanTiles[i] == singletile(type_num / 10, type_num % 10))
 															IsKanTile = true;
 													if (!IsKanTile)
+													{
 														mypai[0].add_tile_status(type_num / 10, type_num % 10, TILE_INVALID);
+														NewTile.add_tile_status(type_num / 10, type_num % 10, TILE_INVALID);
+													}
 												}
 											}
 										}
@@ -2294,6 +2336,8 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 											tempmypai.post_stop_analysis();
 											analysis_completed = false;
 											mypai[0].remove_tile_status(TILE_RECOMMEND);
+											mypai[0].remove_tile_status(TILE_INVALID);
+											NewTile.remove_tile_status(TILE_INVALID);
 											MakeRefresh = true;
 											if ((robot[0].get_paistatus() & PAI_STATUS_RIICHI) != 0)
 											{
@@ -2375,6 +2419,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 											match_info.active_tile = out_singletile;
 											tile_selected = -1;
 											IfShowTenpaiHint = false;
+											match_info.OpenQuadRenShanFlag = false;
 										}
 										tile_out = -1;
 									}
@@ -2405,15 +2450,17 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 						case RESPONSE_WIN:
 							WinPaiStatus = robot[SpecialAction.ActionDirection].get_paistatus();
 							PaiVisible[SpecialAction.ActionDirection] = true;
-							if (SpecialAction.ActionDirection != MySeat) tempmypai = robot[SpecialAction.ActionDirection].get_pai();
-							else tempmypai = mypai[0];
-							if (match_info.active_direction != SpecialAction.ActionDirection) tempmypai.change_tilenum(match_info.active_tile, 1);
-							if (SpecialAction.ActionDirection != MySeat)
+							if (SpecialAction.ActionDirection != MySeat) 
 							{
+								tempmypai = robot[SpecialAction.ActionDirection].get_pai();
 								robot[SpecialAction.ActionDirection].act(match_info);	
+								if (match_info.active_direction != SpecialAction.ActionDirection) 
+									tempmypai.change_tilenum(match_info.active_tile, 1);
 							}
-							else
+							else 
 							{
+								tempmypai = mypai[0];
+								tempmypai.change_tilenum(match_info.active_tile, 1);
 								match_info.frame_status = FRAME_WIN;
 								match_info.win_direction = MySeat;
 								tileout_completed = false;
@@ -2890,7 +2937,7 @@ void CMahjongSpiritDlg::OnGamesettingReset()
 void CMahjongSpiritDlg::UpdateRules(bool FromMain)
 {
 	void* MainData[] = {&MatchFormat, &TopBonus, &OriginPoints, &RankHorse_1, &RankHorse_2, &BackPoints,
-	&NineOrphans, &ChanAnKan, &match_info.DoubleWindTile, &OpenQuadRenShan, &DrawMangan, &NegativeEnd};
+	&NineOrphans, &ChanAnKan, &match_info.DoubleWindTile, &match_info.OpenQuadRenShan, &DrawMangan, &NegativeEnd};
 	void* SettingDlgData[] = {
 		&pRulesSettingsDlg->MatchFormat, &pRulesSettingsDlg->TopBonus, &pRulesSettingsDlg->OriginPoints, 
 		&pRulesSettingsDlg->RankHorse_1, &pRulesSettingsDlg->RankHorse_2, &pRulesSettingsDlg->BackMarks,

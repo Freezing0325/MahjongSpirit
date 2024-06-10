@@ -100,7 +100,6 @@ public:
 	bool TopBonus;			//头名赏
 	int BackPoints;				//返点
 	BYTE MatchFormat;			//赛制
-	bool OpenQuadRenShan;	//大明杠岭上开花包牌
 	bool DrawMangan;		//流局满贯
 	bool NineOrphans;		//九种九牌流局
 	bool NegativeEnd;		//击飞（负分结束）

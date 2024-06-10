@@ -1612,6 +1612,7 @@ hupaiinfo pai::ifhu(singletile lasttile, bool test, UINT nFlags, matchinfo match
 						break;
 
 					case ankan:
+						kenum ++;
 						kannum ++;
 						ankenum ++;
 						SingleTypeSum[hutile.allgroup[i].keytype] += 4;
@@ -2070,7 +2071,7 @@ hupaiinfo pai::ifhu(singletile lasttile, bool test, UINT nFlags, matchinfo match
 		// 自己是庄家
 		if ((self_direction - match_info.this_dealer + 4) % 4 == east)
 		{
-			if(tsumo)
+			if(tsumo && !(match_info.OpenQuadRenShan && match_info.OpenQuadRenShanFlag))
 			{
 				_itoa_s(get_point.dealer_point, tempnum, 10);
 				strcat_s(get_point_info, strlen(get_point_info) + strlen(tempnum) + 1, tempnum);
@@ -2088,7 +2089,7 @@ hupaiinfo pai::ifhu(singletile lasttile, bool test, UINT nFlags, matchinfo match
 		// 自己是闲家
 		else
 		{
-			if(tsumo)
+			if(tsumo && !(match_info.OpenQuadRenShan && match_info.OpenQuadRenShanFlag))
 			{
 				_itoa_s(get_point.normal_point, tempnum, 10);
 				strcat_s(get_point_info, strlen(get_point_info) + strlen(tempnum) + 1, tempnum);
