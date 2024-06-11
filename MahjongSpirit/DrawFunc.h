@@ -53,11 +53,11 @@ BOOL SpinImage(CImage &DestImage, BYTE SpinTimes = 1);
 // 获取选择框图像，需要传入：最后存储图像的CImage变量，全部选项信息
 BOOL ChooseColumn(CImage& DestImage, UINT nFlags);
 // 在特定高度显示选择框
-void ShowChooseColumn(HDC Hdc, int ShowY, UINT nFlags = 0x0);
+void ShowChooseColumn(HDC Hdc, int DlgWidth, int ShowY, UINT nFlags = 0x0);
 // 在特定位置显示有一定透明度，可自定义字体和大小的文字
 BOOL ShowTransparentText(CWnd* DestControl, CWnd* BackControl, CString Text, CString Font, int FontSize, COLORREF FontColor, POINT ShowPos, BYTE Alpha, CImage& TextImage, CImage& BackImage, BOOL IfRemake = false);
 // 实现两张图像的渐变
-BOOL ChangeSurface(CWnd* SurfaceControl, CImage& LastSurface, CImage& NextSurface, int enter_rate);
+BOOL ChangeSurface(HDC Hdc, CImage& LastSurface, CImage& NextSurface, int enter_rate);
 // 在特定位置显示特定颜色的半透明提示框
 BOOL ShowHintBox(HDC Hdc, POINT ShowPos, int Width, int Height, COLORREF BoxColor = RGB(0, 0, 255), BYTE Alpha = 100);
 // 从资源文件中读取图片资源
@@ -68,5 +68,6 @@ bool ShowCutScenes(HDC Hdc, int Direction, int CutRate, const int& DlgWidth, con
 bool ShowCutScenes(HDC Hdc, const CImage &SceneImage, const int& DlgWidth, const int& DlgHeight, const POINT &FullShowPos, double LoadRate, int ForwardAngleByDegree, int Alpha = 100);
 // 在特定位置显示有一定透明度，可自定义字体和大小的文字
 BOOL ShowTransparentText(const HDC &Hdc, const CString &Text, const CString &Font, const int& FontSize, const COLORREF &FontColor, const POINT &ShowPos, const BYTE &Alpha);
+BOOL ShowTransparentText(const HDC &Hdc, const CString &Text, const CString &Font, const int& FontSize, const COLORREF &FontColor, const RECT &ShowRect, const BYTE &Alpha, const UINT &Formats);
 // 获取渐变色图片
 bool GetGradientColorImage(CImage& DestImage, const COLORREF &BeginColor, const COLORREF &EndColor, int DestWidth, int DestHeight, BYTE Flag = GRADIENT_FROMCENTER);

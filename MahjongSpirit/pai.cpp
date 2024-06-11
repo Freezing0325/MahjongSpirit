@@ -221,7 +221,7 @@ void pai::print_tiles(HDC hdc, POINT printpos, int seat, bool visible, int selec
 				ThisFuluImage.ReleaseDC();
 				ThisFuluImage.Destroy();
 			}
-			TransparentBlt(hdc, printpos.x + 11 * TILE_STRAIGHT_WIDTH + 4 * TILE_ACROSS_WIDTH + 5 * TILE_NEWSPACE + 13 * TILE_SPACE - FuluWidth, printpos.y - FuluHeight + TILE_STRAIGHT_HEIGHT, 
+			TransparentBlt(hdc, printpos.x + 14 * TILE_STRAIGHT_WIDTH + 4 * TILE_ACROSS_WIDTH + 5 * TILE_NEWSPACE + 13 * TILE_SPACE - FuluWidth, printpos.y - FuluHeight + TILE_STRAIGHT_HEIGHT, 
 				FuluWidth, FuluHeight, hFuluDC, 0, 0, FuluWidth, FuluHeight, RGB(255, 255, 255));
 			FuluImage.ReleaseDC();
 			FuluImage.Destroy();
@@ -421,7 +421,7 @@ void pai::print_tiles(HDC hdc, POINT printpos, int seat, bool visible, int selec
 				ThisFuluImage.Destroy();
 			}
 
-			TransparentBlt(hdc, printpos.x - (11 * TILE_STRAIGHT_WIDTH + 4 * TILE_ACROSS_WIDTH + 5 * TILE_NEWSPACE + 13 * TILE_SPACE), printpos.y - TILE_STRAIGHT_HEIGHT, 
+			TransparentBlt(hdc, printpos.x - (14 * TILE_STRAIGHT_WIDTH + 4 * TILE_ACROSS_WIDTH + 5 * TILE_NEWSPACE + 13 * TILE_SPACE), printpos.y - TILE_STRAIGHT_HEIGHT, 
 				FuluWidth, FuluHeight, hFuluDC, 0, 0, FuluWidth, FuluHeight, RGB(255, 255, 255));
 			FuluImage.ReleaseDC();
 			FuluImage.Destroy();
@@ -617,7 +617,7 @@ void pai::print_tiles(HDC hdc, POINT printpos, int seat, bool visible, int selec
 				ThisFuluImage.Destroy();
 			}
 
-			TransparentBlt(hdc, printpos.x + TILE_ACROSS_WIDTH - FuluWidth, printpos.y - (9 * TILE_ACROSS_SURFACE_HEIGHT + TILE_ACROSS_HEIGHT + 4 * TILE_STRAIGHT_SURFACE_HEIGHT + 5 * TILE_NEWSPACE + 13 * TILE_SPACE), 
+			TransparentBlt(hdc, printpos.x + TILE_ACROSS_WIDTH - FuluWidth, printpos.y - (13 * TILE_ACROSS_SURFACE_HEIGHT + TILE_ACROSS_HEIGHT + 4 * TILE_STRAIGHT_SURFACE_HEIGHT + 5 * TILE_NEWSPACE + 13 * TILE_SPACE), 
 				FuluWidth, FuluHeight, hFuluDC, 0, 0, FuluWidth, FuluHeight, RGB(255, 255, 255));
 			FuluImage.ReleaseDC();
 			FuluImage.Destroy();
@@ -827,7 +827,7 @@ void pai::print_tiles(HDC hdc, POINT printpos, int seat, bool visible, int selec
 				ThisFuluImage.Destroy();
 			}
 			
-			TransparentBlt(hdc, printpos.x - TILE_ACROSS_WIDTH, printpos.y + 9 * TILE_ACROSS_SURFACE_HEIGHT + TILE_ACROSS_HEIGHT + 4 * TILE_STRAIGHT_SURFACE_HEIGHT + 5 * TILE_NEWSPACE + 13 * TILE_SPACE - FuluHeight, 
+			TransparentBlt(hdc, printpos.x - TILE_ACROSS_WIDTH, printpos.y + 13 * TILE_ACROSS_SURFACE_HEIGHT + TILE_ACROSS_HEIGHT + 4 * TILE_STRAIGHT_SURFACE_HEIGHT + 5 * TILE_NEWSPACE + 13 * TILE_SPACE - FuluHeight, 
 				FuluWidth, FuluHeight, hFuluDC, 0, 0, FuluWidth, FuluHeight, RGB(255, 255, 255));
 			FuluImage.ReleaseDC();
 			FuluImage.Destroy();

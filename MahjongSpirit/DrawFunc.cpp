@@ -150,13 +150,13 @@ BOOL ChooseColumn(CImage& DestImage, UINT nFlags)
 	return true;
 }
 
-void ShowChooseColumn(HDC Hdc, int ShowY, UINT nFlags)
+void ShowChooseColumn(HDC Hdc, int DlgWidth, int ShowY, UINT nFlags)
 {
 	if (nFlags == 0) return;
 	CImage ChooseColumnImage;
 	ChooseColumn(ChooseColumnImage, nFlags);
 	HDC hChooseColumnDC = ChooseColumnImage.GetDC();
-	TransparentBlt(Hdc, 1200 - ChooseColumnImage.GetWidth(), ShowY, ChooseColumnImage.GetWidth(), ChooseColumnImage.GetHeight(),
+	TransparentBlt(Hdc, DlgWidth - ChooseColumnImage.GetWidth(), ShowY, ChooseColumnImage.GetWidth(), ChooseColumnImage.GetHeight(),
 		hChooseColumnDC, 0, 0, ChooseColumnImage.GetWidth(), ChooseColumnImage.GetHeight(), RGB(255, 255, 255));
 	ChooseColumnImage.ReleaseDC();
 	ChooseColumnImage.Destroy();
@@ -235,40 +235,35 @@ BOOL ShowTransparentText(CWnd* DestControl, CWnd* BackControl, CString Text, CSt
 	return true;
 }
 
-BOOL ChangeSurface(CWnd* SurfaceControl, CImage& LastSurface, CImage& NextSurface, int enter_rate)
+BOOL ChangeSurface(HDC Hdc, CImage& LastSurface, CImage& NextSurface, int enter_rate)
 {
-	CDC* surfaceDC = SurfaceControl->GetDC();
-	HDC hsurfaceDC = surfaceDC->GetSafeHdc();
-	RECT surfaceRect;
-	SurfaceControl->GetWindowRect(&surfaceRect);
+	int SurfaceWidth = NextSurface.GetWidth();
+	int SurfaceHeight = NextSurface.GetHeight();
+	
 	if (LastSurface.IsNull())
 	{
-		LastSurface.Create(surfaceRect.right, surfaceRect.bottom, 32);
+		LastSurface.Create(SurfaceWidth, SurfaceHeight, 32);
 		HDC hlastSurfaceDC = LastSurface.GetDC();
-		BitBlt(hlastSurfaceDC, 0, 0, surfaceRect.right, surfaceRect.bottom, surfaceDC->GetSafeHdc(), 0, 0, SRCCOPY);
+		BitBlt(hlastSurfaceDC, 0, 0, SurfaceWidth, SurfaceHeight, Hdc, 0, 0, SRCCOPY);
 		LastSurface.ReleaseDC();
 	}
-	CImage TempImage;
-	TempImage.Create(surfaceRect.right, surfaceRect.bottom, 32);
-	
 	if (enter_rate == 50)
 	{
 		LastSurface.Destroy();
-		LastSurface.Create(surfaceRect.right, surfaceRect.bottom, 32);
+		LastSurface.Create(SurfaceWidth, SurfaceHeight, 32);
 		HDC hlastSurfaceDC = LastSurface.GetDC(), hnextSurfaceDC = NextSurface.GetDC();
-		BitBlt(hlastSurfaceDC, 0, 0, surfaceRect.right, surfaceRect.bottom, hnextSurfaceDC, 0, 0, SRCCOPY);
+		BitBlt(hlastSurfaceDC, 0, 0, SurfaceWidth, SurfaceHeight, hnextSurfaceDC, 0, 0, SRCCOPY);
 		LastSurface.ReleaseDC();
 		NextSurface.ReleaseDC();
 	}
-	HDC htempimageDC = TempImage.GetDC(), hlastSurfaceDC = LastSurface.GetDC();
+	HDC hlastSurfaceDC = LastSurface.GetDC();
+	RECT SurfaceRect = {0, 0, SurfaceWidth, SurfaceHeight};
+	HBRUSH hBr = CreateSolidBrush(0);
+	FillRect(Hdc, &SurfaceRect, hBr);
+
 	BLENDFUNCTION bf = {AC_SRC_OVER, 0, 255 * abs(50 - enter_rate) / 50, AC_SRC_ALPHA};
-	AlphaBlend(htempimageDC, 0, 0, surfaceRect.right, surfaceRect.bottom, hlastSurfaceDC, 0, 0, surfaceRect.right, surfaceRect.bottom, bf);
+	AlphaBlend(Hdc, 0, 0, SurfaceWidth, SurfaceHeight, hlastSurfaceDC, 0, 0, SurfaceWidth, SurfaceHeight, bf);
 	LastSurface.ReleaseDC();
-	BitBlt(hsurfaceDC, 0, 0, surfaceRect.right, surfaceRect.bottom, htempimageDC, 0, 0, SRCCOPY);
-	TempImage.ReleaseDC();
-	TempImage.Destroy();
-	SurfaceControl->ReleaseDC(surfaceDC);
-	
 	return true;
 }
 
@@ -521,6 +516,31 @@ BOOL ShowTransparentText(const HDC &Hdc, const CString &Text, const CString &Fon
 	TextImage.Destroy();
 	return Result;
 }
+
+BOOL ShowTransparentText(const HDC &Hdc, const CString &Text, const CString &Font, const int& FontSize, const COLORREF &FontColor, const RECT &ShowRect, const BYTE &Alpha, const UINT &Formats)
+{
+	CImage TextImage;
+	BOOL Result = true;
+	HFONT hf = CreateMyFont(Font, FontSize);
+	int TextWidth = ShowRect.right - ShowRect.left, TextHeight = ShowRect.bottom - ShowRect.top;
+	TextImage.Create(TextWidth, TextHeight, 32);
+	HDC hTextImageDC = TextImage.GetDC();
+	Result &= BitBlt(hTextImageDC, 0, 0, TextWidth, TextHeight, Hdc, ShowRect.left, ShowRect.top, SRCCOPY);
+
+	SelectObject(hTextImageDC, hf);
+	SetBkMode(hTextImageDC, TRANSPARENT);
+	SetTextColor(hTextImageDC, FontColor);
+	RECT ThisShowRect = {0, 0, TextWidth, TextHeight};
+	Result &= DrawTextW(hTextImageDC, Text, lstrlenW(Text), &ThisShowRect, Formats);
+	POINT ShowPos = {ShowRect.left, ShowRect.top};
+	Result &= TextImage.AlphaBlend(Hdc, ShowPos, Alpha);
+	DeleteObject(hf);
+	TextImage.ReleaseDC();
+	TextImage.Destroy();
+	return Result;
+}
+
+
 
 bool GetGradientColorImage(CImage& DestImage, const COLORREF &BeginColor, const COLORREF &EndColor, int DestWidth, int DestHeight, BYTE Flag)
 {

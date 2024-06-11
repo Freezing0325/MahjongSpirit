@@ -23,6 +23,7 @@
 //20240610_2307：实现了九种九牌流局和流局满贯，修复了一些BUG。胜利就在眼前。
 //20240611_0221：实现了大明杠包牌的机制，所有规则均可实现。接下来进行实际测试。自己开暗杠与加杠没有动画显示，此前可能忘记搬运了。
 //20240611_1220：实现了开暗杠和加杠的动画显示。接下来要进行窗口大小的调整。
+//20240611_2202：实现了窗口大小的调整，目前窗口增大到了1800*1000，还存在一些BUG，如龙七对的判断，以及四暗刻会判定为三暗刻混一色。
 
 #include "stdafx.h"
 
@@ -77,15 +78,12 @@ CMahjongSpiritDlg::CMahjongSpiritDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CMahjongSpiritDlg::IDD, pParent)
 	, dlg_width(0)
 	, dlg_height(0)
-	, ifshowcover(false)
 	, startbtn_alpha(0)
 	, startbtn_alpha_up(false)
-	, ifshowwelcome(false)
 	, hintpic_alpha(0)
-	, ready_enter(false)
 	, login_succeed(false)
 	, enter_rate(0)
-	, mahjong_start(false)
+	, DlgResize(false)
 	, showtilenum(0)
 	, hintpic_alpha_up(false)
 	, tile_selected(0)
@@ -102,6 +100,7 @@ CMahjongSpiritDlg::CMahjongSpiritDlg(CWnd* pParent /*=NULL*/)
 	, MatchNum(0)
 	, MyTiles(nullptr)
 	, AllOrphans(false)
+	, NoNeedLogin(false)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	m_pPicture = NULL;
@@ -125,15 +124,11 @@ CMahjongSpiritDlg::~CMahjongSpiritDlg()
 void CMahjongSpiritDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
-	DDX_Control(pDX, IDC_COVERPIC, m_coverpic);
-	//  DDX_Control(pDX, ID_BTNSTART, m_startpic);
 }
 
 BEGIN_MESSAGE_MAP(CMahjongSpiritDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
-	ON_BN_CLICKED(IDC_START, &CMahjongSpiritDlg::OnBnClickedStart)
-	ON_STN_CLICKED(ID_BTNSTART, &CMahjongSpiritDlg::OnStnClickedBtnstart)
 	ON_WM_TIMER()
 	ON_WM_ERASEBKGND()
 	ON_WM_MOUSEMOVE()
@@ -148,6 +143,7 @@ BEGIN_MESSAGE_MAP(CMahjongSpiritDlg, CDialogEx)
 	ON_COMMAND(ID_GAMESETTING_MARKS, &CMahjongSpiritDlg::OnGamesettingMarks)
 	ON_COMMAND(ID_GAMESETTING_RESET, &CMahjongSpiritDlg::OnGamesettingReset)
 	ON_WM_SIZE()
+//	ON_WM_CREATE()
 END_MESSAGE_MAP()
 
 
@@ -164,19 +160,23 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	
 	// TODO: 在此添加额外的初始化代码
 	//AllocConsole();
+	RECT WindowRect;
+	GetWindowRect(&WindowRect);
+	int GoalWidth = 1800, GoalHeight = 1012;
+	WindowRect.left -= (GoalWidth - WindowRect.right + WindowRect.left) / 2;
+	WindowRect.top -= (GoalHeight - WindowRect.bottom + WindowRect.top) / 2;
+	WindowRect.right = WindowRect.left + GoalWidth;
+	WindowRect.bottom = WindowRect.top + GoalHeight;
+	this->MoveWindow(&WindowRect);
 	RECT client_rect;
 	GetClientRect(&client_rect);
+
 	dlg_width = client_rect.right - client_rect.left;
 	dlg_height = client_rect.bottom - client_rect.top;
-	NowDlgWidth = dlg_width;
-	NowDlgHeight = dlg_height;
+	RealDlgWidth = NowDlgWidth = dlg_width;
+	RealDlgHeight = NowDlgHeight = dlg_height;
 
-	int MarksBoxWidth = dlg_width / 2;
-	int MarksBoxHeight = MarksBoxWidth * 2 / 3;
-	MarksBoxSize.left = (dlg_width - MarksBoxWidth) / 2;
-	MarksBoxSize.right = (dlg_width + MarksBoxWidth) / 2;
-	MarksBoxSize.top = (dlg_height - MarksBoxHeight) / 2;
-	MarksBoxSize.bottom = (dlg_height + MarksBoxHeight) / 2;
+	
 	for (int i = 0; i < 10; i++)
 		for (int j = 0; j < 4; j++)
 			Marks[i][j] = -1;
@@ -185,12 +185,14 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	pRulesSettingsDlg = new CRulesSettingsDlg;
 	UpdateRules(false);
 
-	ifshowcover = true;
+	ShowType = ShowCover;
+	//ifshowcover = true;
 	startbtn_alpha = 255;
 	MeAutoMode = false;
 	AllVisible = false;
 	DebugMode = false;
 	DrawMode = false;
+	NoNeedLogin = true;
 
 	ThisSeed = (unsigned int)time(NULL);
 	ThisSeed = 1718041776;
@@ -224,7 +226,7 @@ void GetTableImage(CImage& TableImage, int dlg_width, int dlg_height)
 	const int OutFrameLen = 230;
 	const int InnerFrameLen = 70;
 	const int LeanFrameLen = (OutFrameLen - InnerFrameLen) / 2;
-	const POINT StartPos = {480, 190};
+	const POINT StartPos = {dlg_width / 2 - 120, dlg_height / 2 - 148}; //{480, 190}
 	// 画中心的复杂图形
 	{
 		POINT ThisPos = StartPos;
@@ -318,68 +320,9 @@ void CMahjongSpiritDlg::OnPaint()
 		CDialogEx::OnPaint();
 	}
 	
-	if (ifshowcover)
-	{
-		//CImage cover_image;				//使用图片类
-		RECT rect = {0};
-
-		//加载封面
-		static bool ifcover_loaded = false;
-		if (!ifcover_loaded)
-		{
-			CImage image;
-			LoadImageFromResource(image, IDB_PNG_COVER, _T("PNG"));
-			//image.Load(_T("封面.png")); 
-			rect.right = image.GetWidth();
-			rect.bottom = image.GetHeight();
-			CDC* pDC = GetDlgItem(IDC_COVERPIC)->GetDC();
-			m_coverpic.SetWindowPos(NULL, 0, 0, rect.right, rect.bottom, SWP_NOZORDER);
-			image.Draw(pDC->m_hDC, rect);
-			image.Destroy();
-			ReleaseDC(pDC);
-			ifcover_loaded = true;
-		}
-
-		//加载开始按钮
-		CString start_hint = _T("—— start ——");
-		CWnd* m_startpic = GetDlgItem(ID_BTNSTART);
-		POINT startbtn_pos = {450, 530};
-		static CImage start_textimage, start_backimage;
-		ShowTransparentText(m_startpic, GetDlgItem(IDC_COVERPIC), start_hint, _T("Times New Roman"), 48, RGB(255, 174, 201), startbtn_pos, startbtn_alpha, start_textimage, start_backimage);
-		if (ifshowwelcome)
-		{
-			CString welcome_hint = _T("欢迎回来，极地严寒");
-			CWnd* m_hintpic = GetDlgItem(IDC_HINTPIC);
-			POINT hintinfo_pos = {420, 600};
-			static CImage welcome_textimage, welcome_backimage;
-			ShowTransparentText(m_hintpic, GetDlgItem(IDC_COVERPIC), welcome_hint, _T("华康勘亭流W9(P)"), 48, RGB(255, 174, 201), hintinfo_pos, hintpic_alpha, welcome_textimage, welcome_backimage);
-		}
-		
-	}
-
-	if (ready_enter)
-	{
-		static CImage lastSurface, nextSurface, nextSurface_copy;
-		HDC hNextDC;
-		if (nextSurface.IsNull())
-		{
-			GetTableImage(nextSurface, dlg_width, dlg_width);
-		}
-		ChangeSurface(GetDlgItem(IDC_COVERPIC), lastSurface, nextSurface, enter_rate);
-		if (enter_rate == 100)
-		{
-			frame_start = true;
-			if (!lastSurface.IsNull())
-				lastSurface.Destroy();
-			if (!nextSurface.IsNull())
-				nextSurface.Destroy();
-		}
-	}
 	//双缓冲技术
-	CRect rc;				
-	GetClientRect(&rc);
-	CDC *pCDC = GetDC();		//定义设备上下文
-		
+
+	CDC *pCDC = GetDC();		//定义设备上下文		
 	CDC MemDC;					//定义一个内存显示设备对象
 	CBitmap MemBitmap;			//定义一个位图对象
 	//建立与屏幕显示兼容的内存显示设备
@@ -388,259 +331,338 @@ void CMahjongSpiritDlg::OnPaint()
 	MemBitmap.CreateCompatibleBitmap(pCDC, NowDlgWidth, NowDlgHeight);
 	//将位图选入到内存显示设备中，只有选入了位图的内存显示设备才有地方绘图，画到指定的位图上
 	CBitmap *pOldBitmap = MemDC.SelectObject(&MemBitmap);
-	MemDC.FillSolidRect(0,0, NowDlgWidth, NowDlgHeight,0);
+	//MemDC.FillSolidRect(0,0, NowDlgWidth, NowDlgHeight,0);
 	HDC hdc = MemDC.GetSafeHdc();
 
-	if (mahjong_start)
+	if (DlgResize)
+		pCDC->FillSolidRect(0,0, RealDlgWidth, RealDlgHeight,0);
+
+	switch (ShowType)
 	{
-		//加载牌桌
-		static CImage TableImage;
-		if (TableImage.IsNull())
+	case CMahjongSpiritDlg::None:
+		break;
+	case CMahjongSpiritDlg::ShowCover:
+	case CMahjongSpiritDlg::ShowWelcome:
 		{
-			//LoadImageFromResource(tableimage, IDB_PNG_TABLE, _T("PNG"));
-			//tableimage.Load(_T("麻将桌.png"));
-			GetTableImage(TableImage, NowDlgWidth, NowDlgHeight);
+
+			//加载封面
+			static CImage CoverImage;
+			if (CoverImage.IsNull() || DlgResize)
+			{
+				LoadImageFromResource(CoverImage, IDB_PNG_COVER, _T("PNG"));
+				//CoverImage.Load(_T("封面.png")); 
+			}
+			HDC hCoverDC = CoverImage.GetDC();
+			StretchBlt(hdc, 0, 0, NowDlgWidth, NowDlgHeight, hCoverDC, 0, 0, CoverImage.GetWidth(), CoverImage.GetHeight(), SRCCOPY);
+			CoverImage.ReleaseDC();
+
+			//加载开始按钮
+			CString start_hint = _T("—— start ——");
+			CWnd* m_startpic = GetDlgItem(ID_BTNSTART);
+			StartBtn.left = NowDlgWidth / 2 - 150;
+			StartBtn.right = NowDlgWidth / 2 + 150;
+			StartBtn.top = NowDlgHeight - 145;
+			StartBtn.bottom = NowDlgHeight - 45;
+			POINT StartBtnPos = {StartBtn.left, StartBtn.top};
+			ShowTransparentText(hdc, start_hint, _T("Times New Roman"), 48, RGB(255, 174, 201), StartBtn, startbtn_alpha, DT_CENTER | DT_VCENTER);
+			if (ShowType == CMahjongSpiritDlg::ShowWelcome)
+			{
+				CString welcome_hint = _T("欢迎回来，极地严寒");
+				RECT HintInfoRect = {NowDlgWidth / 2 - 250, NowDlgHeight - 75, NowDlgWidth / 2 + 250, NowDlgHeight - 25};
+				ShowTransparentText(hdc, welcome_hint, _T("华康勘亭流W9(P)"), 48, RGB(255, 174, 201), HintInfoRect, hintpic_alpha, DT_CENTER | DT_VCENTER);
+			}
 		}
-		TableImage.BitBlt(hdc, 0, 0, SRCCOPY);
-		POINT hintbox_pos = {0, 0};
-		
-		pai_pos[0].x = 260;
-		pai_pos[0].y = 570;
-		pai_pos[1].x = 1125;
-		pai_pos[1].y = 600;
-		pai_pos[2].x = 940;
-		pai_pos[2].y = 90;
-		pai_pos[3].x = 75;
-		pai_pos[3].y = 70;
-		paihe_pos[0].x = 437;
-		paihe_pos[0].y = 375;
-		paihe_pos[1].x = 800;
-		paihe_pos[1].y = 475;
-		paihe_pos[2].x = 742;
-		paihe_pos[2].y = 250;
-		paihe_pos[3].x = 400;
-		paihe_pos[3].y = 200;
-		ChooseColumnPos.x = 600;
-		ChooseColumnPos.y = 450;
-		if (!frame_start)
+		break;
+	case CMahjongSpiritDlg::ReadyEnter:
 		{
-			//-----------------------------------显示宝牌及其它场上标志物-------------------------------------
+			static CImage lastSurface, nextSurface, nextSurface_copy;
+			if (lastSurface.IsNull() || DlgResize)
 			{
-				const POINT dora_pos = {463, 260};
-				const POINT dealer_label_pos[4] = {{260, 530}, {1020, 500}, {840, 130}, {100, 100}};
-				const POINT RobotInfoPos[4] = {{350, 520}, {1010, 430}, {930, 120}, {90, 145}};
-				POINT ThisDealerLabelPos = dealer_label_pos[match_info.this_dealer];
-
-				static BYTE RollStatus = 0;		//翻转宝牌的进度
-				if (match_info.frame_status == FRAME_WIN && ((WinPaiStatus & PAI_STATUS_RIICHI) != 0))
-				{
-					match_info.print_dora(hdc, dora_pos, RollStatus);
-					if (RollStatus < 2)
-					{
-						RollStatus ++;
-						int doraimage_width = 5 * (TILE_STRAIGHT_WIDTH + TILE_SPACE) - TILE_SPACE;
-						int doraimage_height = TILE_STRAIGHT_HEIGHT + TILE_STRAIGHT_SURFACE_HEIGHT;
-						RECT DoraRect = {dora_pos.x, dora_pos.y, dora_pos.x + doraimage_width, dora_pos.y + doraimage_height};
-						InvalidateRect(&DoraRect, false);
-					}
-				}
-				else
-				{
-					match_info.print_dora(hdc, dora_pos);
-					RollStatus = 0;
-				}
-
-				//-----------------------------显示庄家-------------------------------------
-				CString dealer_label = _T("Dealer");
-				HFONT hf = CreateMyFont(_T("华文新魏"), 24);
-				SelectObject(hdc, hf);
-				SetBkMode(hdc, TRANSPARENT);
-				SetTextColor(hdc, RGB(255, 174, 201));
-				hintbox_pos.x = ThisDealerLabelPos.x - 10;
-				hintbox_pos.y = ThisDealerLabelPos.y - 10;
-				ShowHintBox(hdc, hintbox_pos, 90, 45, RGB(255, 0, 0));
-				TextOutW(hdc, ThisDealerLabelPos.x, ThisDealerLabelPos.y, dealer_label, lstrlenW(dealer_label));
-				DeleteObject(hf);
-				
-				//-----------------------------显示分数与名称-------------------------------------
-				if (AllRobot)
-				{
-					hf = CreateMyFont(_T("华文中宋"), 24);
-					SelectObject(hdc, hf);
-					SetBkMode(hdc, TRANSPARENT);
-					SetTextColor(hdc, RGB(255, 255, 255));
-					for (int i = 0; i < 4; i++)
-					{
-						CString RobotInfoString = AllRobot[i].GetRobotName();
-						RobotInfoString.AppendFormat(_T("\n%6d"), AllRobot[i].GetPoints());
-						RECT RobotInfoRect = {RobotInfoPos[i].x, RobotInfoPos[i].y, RobotInfoPos[i].x + 100, RobotInfoPos[i].y + 80};
-						DrawTextW(hdc, RobotInfoString, lstrlenW(RobotInfoString), &RobotInfoRect, DT_TOP | DT_LEFT);
-						//TextOutW(hdc, RobotInfoPos[i].x, RobotInfoPos[i].y, RobotInfoString, lstrlenW(RobotInfoString));
-					}
-					DeleteObject(hf);
-				}
+				lastSurface.Create(NowDlgWidth, NowDlgHeight, 32);
+				HDC hlastSurfaceDC = lastSurface.GetDC();
+				BitBlt(hlastSurfaceDC, 0, 0, NowDlgWidth, NowDlgHeight, pCDC->GetSafeHdc(),0, 0, SRCCOPY);
+				lastSurface.ReleaseDC();
 			}
-			//-----------------------------------配牌阶段-------------------------------------
-			if (!get_all_tiles)
+			if (nextSurface.IsNull() || DlgResize)
 			{
-				for (int i = 0; i < (showtilenum + 3) / 4; i++)
-					if (temptiles[i].get_tilesum() > 0)
-						temptiles[i].print_tiles(hdc, pai_pos[0].x + (4 * i) * (TILE_STRAIGHT_WIDTH + TILE_SPACE), pai_pos[0].y);
+				GetTableImage(nextSurface, NowDlgWidth, NowDlgHeight);
 			}
-			//----------------------------------配牌完成，开始打牌----------------------------------
-			else
+			ChangeSurface(hdc, lastSurface, nextSurface, enter_rate);
+			if (enter_rate == 100)
 			{
-				//牌面打印
-				if (tileout_completed)
+				frame_start = true;
+				if (!lastSurface.IsNull())
+					lastSurface.Destroy();
+				if (!nextSurface.IsNull())
+					nextSurface.Destroy();
+			}
+		}
+		break;
+	case CMahjongSpiritDlg::MahjongStart:
+		{
+			static CImage TableImage;
+			if (TableImage.IsNull() || DlgResize)
+			{
+				//LoadImageFromResource(tableimage, IDB_PNG_TABLE, _T("PNG"));
+				//tableimage.Load(_T("麻将桌.png"));
+				GetTableImage(TableImage, NowDlgWidth, NowDlgHeight);
+			}
+			TableImage.BitBlt(hdc, 0, 0, SRCCOPY);
+			POINT hintbox_pos = {0, 0};
+		
+			pai_pos[0].x = NowDlgWidth / 2 - 340;	//260
+			pai_pos[0].y = NowDlgHeight - 105;		//570
+			pai_pos[1].x = NowDlgWidth - 75;		//1125;
+			pai_pos[1].y = NowDlgHeight / 2 + 262;		//600
+			pai_pos[2].x = NowDlgWidth / 2 + 340;	//940;
+			pai_pos[2].y = 90;						
+			pai_pos[3].x = 75;
+			pai_pos[3].y = NowDlgHeight / 2 - 268;	//70
+			paihe_pos[0].x = NowDlgWidth / 2 - 165;	//437
+			paihe_pos[0].y = NowDlgHeight - 300;	//375;
+			paihe_pos[1].x = NowDlgWidth - 400;		//800;
+			paihe_pos[1].y = NowDlgHeight / 2 + 137;//475;
+			paihe_pos[2].x = NowDlgWidth / 2 + 142; //742;
+			paihe_pos[2].y = 250;
+			paihe_pos[3].x = 400;
+			paihe_pos[3].y = NowDlgHeight / 2 - 138;	//200;
+			ChooseColumnPos.x = NowDlgWidth - 600;
+			ChooseColumnPos.y = NowDlgHeight - 225;
+			if (!frame_start)
+			{
+				//-----------------------------------显示宝牌及其它场上标志物-------------------------------------
 				{
-					for (int seat = 0; seat < 4; seat++)
-					{
-						mypai[seat].print_tiles(hdc, pai_pos[seat], seat, PaiVisible[seat]/*seat != 0*/, tile_selected);
-						mypai[seat].print_river(hdc, paihe_pos[seat], seat);
-					}
-				}
-				else 
-				{
-					bool PrintNewTile = (match_info.frame_status == FRAME_NORMAL || FRAME_DRAW_NINE_ORPHANS || (match_info.frame_status == FRAME_WIN && match_info.active_direction == match_info.win_direction));
-					direction NewTileDirection = match_info.active_direction;
-					bool NewTile_visible = PaiVisible[NewTileDirection];
-					POINT NewTile_pos = pai_pos[NewTileDirection];
-					switch (NewTileDirection)
-					{
-					case east:
-						NewTile_pos.x += mypai[0].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE;
-						break;
-					case south:
-						NewTile_pos.y -= (mypai[1].get_tilesum()) * (TILE_ACROSS_SURFACE_HEIGHT + TILE_SPACE) + TILE_NEWSPACE;
-						break;
-					case west:
-						NewTile_pos.x -= mypai[2].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE;
-						break;
-					case north:
-						NewTile_pos.y += (mypai[3].get_tilesum()) * (TILE_ACROSS_SURFACE_HEIGHT + TILE_SPACE) + TILE_NEWSPACE;
-						break;
-					default:
-						break;
-					}
-					if (match_info.frame_status != FRAME_NORMAL)
-					{
-						NewTile.remove_tile_status(TILE_RECOMMEND);
-					}
-					if (match_info.active_direction != north && PrintNewTile)
-						NewTile.print_tiles(hdc, NewTile_pos, NewTileDirection, NewTile_visible, tile_selected - mypai[0].get_tilesum());
-					for (int seat = 0; seat < 4; seat++)
-					{
-						mypai[seat].print_tiles(hdc, pai_pos[seat], seat, PaiVisible[seat]/*seat != 0*/, tile_selected);
-						mypai[seat].print_river(hdc, paihe_pos[seat], seat);
-					}
-					if (match_info.active_direction == north && PrintNewTile)
-						NewTile.print_tiles(hdc, NewTile_pos, NewTileDirection, NewTile_visible, tile_selected - mypai[0].get_tilesum());
-				}
-				if (IfShowChiFuluHint)
-				{
-					hintbox_pos.x = pai_pos[0].x;
-					hintbox_pos.y = pai_pos[0].y - TILE_STRAIGHT_HEIGHT * 2;
-					ShowHintBox(hdc, hintbox_pos, 5 * TILE_STRAIGHT_WIDTH, TILE_STRAIGHT_HEIGHT * 1.5);
-					temptiles[0].print_tiles(hdc, hintbox_pos.x + TILE_STRAIGHT_WIDTH, hintbox_pos.y + TILE_STRAIGHT_HEIGHT * 0.25);
-				}
-				if (IfShowTenpaiHint)
-				{
-					hintbox_pos.x = pai_pos[0].x;
-					hintbox_pos.y = pai_pos[0].y - TILE_STRAIGHT_HEIGHT * 2;
-					ShowHintBox(hdc, hintbox_pos, (temptiles[1].get_tilesum() + 2) * TILE_STRAIGHT_WIDTH, TILE_STRAIGHT_HEIGHT * 1.5);
-					temptiles[1].print_tiles(hdc, hintbox_pos.x + TILE_STRAIGHT_WIDTH, hintbox_pos.y + TILE_STRAIGHT_HEIGHT * 0.25);
-				}
-				if (OneRoundForesee && match_info.active_direction == MySeat)
-				{
-					hintbox_pos.x = pai_pos[0].x + 13 * (TILE_STRAIGHT_WIDTH + TILE_SPACE);
-					hintbox_pos.y = pai_pos[0].y - TILE_STRAIGHT_HEIGHT * 1.5;
-					ShowHintBox(hdc, hintbox_pos, 3 * TILE_STRAIGHT_WIDTH, TILE_STRAIGHT_HEIGHT * 1.5, RGB(0, 255, 0));
-					temptiles[2].print_tiles(hdc, pai_pos[0].x + 14 * (TILE_STRAIGHT_WIDTH + TILE_SPACE), pai_pos[0].y - TILE_STRAIGHT_HEIGHT * 1.25);
-				}
-				if (IfShowChooseColumn) 
-					ShowChooseColumn(hdc, ChooseColumnPos.y, ChooseFlags);
-				if (match_info.frame_status != FRAME_NORMAL && CutScenesType == None)
-				{
-					IfShowChooseColumn = false;
-					IfShowTenpaiHint = false;
-					CString hint_info;
-					int hint_info_lines = 1;
-					if (match_info.win_direction == noneed)
-					{
-						hint_info = _T("流局！");
-						if (!AllVisible) for (int seat = 0; seat < 4; PaiVisible[seat++] = mypai[seat].iftingpai());
-					}
-					else if (match_info.frame_status == FRAME_DRAW_MANGAN)
-					{
-						hint_info = _T("流局满贯！");
+					const POINT dora_pos = {NowDlgWidth / 2 - 135, NowDlgHeight / 2 - 78};
+						//{463, 260};
+					const POINT dealer_label_pos[4] = {
+						{NowDlgWidth / 2 - 340, NowDlgHeight - 145}, 
+						{NowDlgWidth - 180, NowDlgHeight / 2 + 162},
+						{NowDlgWidth / 2 + 240, 130}, 
+						{100, NowDlgHeight / 2 - 238}
+					};
+						//{{260, 530}, {1020, 500}, {840, 130}, {100, 100}};
+					const POINT RobotInfoPos[4] = {
+						{NowDlgWidth / 2 - 250, NowDlgHeight - 155},
+						{NowDlgWidth - 190, NowDlgHeight / 2 + 92},
+						{NowDlgWidth / 2 + 330, 120},
+						{90, NowDlgHeight / 2 - 197}
+					};
+						//{{350, 520}, {1010, 430}, {930, 120}, {90, 145}};
+					POINT ThisDealerLabelPos = dealer_label_pos[match_info.this_dealer];
 
+					static BYTE RollStatus = 0;		//翻转宝牌的进度
+					if (match_info.frame_status == FRAME_WIN && ((WinPaiStatus & PAI_STATUS_RIICHI) != 0))
+					{
+						match_info.print_dora(hdc, dora_pos, RollStatus);
+						if (RollStatus < 2)
+						{
+							RollStatus ++;
+							int doraimage_width = 5 * (TILE_STRAIGHT_WIDTH + TILE_SPACE) - TILE_SPACE;
+							int doraimage_height = TILE_STRAIGHT_HEIGHT + TILE_STRAIGHT_SURFACE_HEIGHT;
+							RECT DoraRect = {dora_pos.x, dora_pos.y, dora_pos.x + doraimage_width, dora_pos.y + doraimage_height};
+							InvalidateRect(&DoraRect, false);
+						}
 					}
 					else
 					{
-					// 获取和牌的信息
-						if (!pHupaiInfo)
-						{
-							pHupaiInfo = new hupaiinfo;
-							//static hupaiinfo my_hupai_info;
-							BYTE HuFlags = 0;
-							HuFlags |= HU_RIICHI * ((WinPaiStatus & PAI_STATUS_RIICHI) != 0);
-							HuFlags |= HU_WRIICHI * ((WinPaiStatus & PAI_STATUS_WRIICHI) != 0);
-							HuFlags |= HU_IPPATSU * ((WinPaiStatus & PAI_STATUS_IPPATSU) != 0);
-							HuFlags |= HU_TENHOU * (match_info.tenhou_possible && match_info.win_direction == match_info.active_direction);
-							HuFlags |= HU_RINSHAN * ((WinPaiStatus & PAI_STATUS_RINSHAN) != 0);
-							HuFlags |= HU_HAITEI * (remaintiles.get_tilesum() == 4);
-							HuFlags |= HU_CHANKAN * match_info.chankan_possible;
-							HuFlags |= HU_TSUMO * (match_info.win_direction == match_info.active_direction);
-							//tempmypai.change_tilenum(match_info.active_tile, 1);
-							*pHupaiInfo = tempmypai.ifhu(match_info.active_tile, false, HuFlags, match_info, match_info.win_direction);
-						}
-						// 生成和牌信息的字符串
-						CString my_hupai_string;
-						int FanZhongLen = strlen(pHupaiInfo->fanzhong), HuTypeLen = strlen(pHupaiInfo->hutype);
-						int length = FanZhongLen + HuTypeLen;
-						CHAR* my_hupai_char = new CHAR[length + 1];
-						strcpy_s(my_hupai_char, FanZhongLen + 1, pHupaiInfo->fanzhong);
-						strcat_s(my_hupai_char, length + 1, pHupaiInfo->hutype);
-						WCHAR* my_hupai_wchar = new WCHAR[length + 1];
-						memset(my_hupai_wchar, 0, sizeof(WCHAR) * (length + 1));
-						MultiByteToWideChar(CP_ACP, 0, my_hupai_char, length, my_hupai_wchar, length);
-						for (int i = 0; i < wcslen(my_hupai_wchar); i++)
-							if (my_hupai_wchar[i] == ' ')
-							{
-								my_hupai_wchar[i] = '\n';
-								hint_info_lines ++;
-							}
-						my_hupai_string.Format(_T("%s"), my_hupai_wchar);
-						delete[] my_hupai_char;
-						delete[] my_hupai_wchar;
-						hint_info = my_hupai_string;
+						match_info.print_dora(hdc, dora_pos);
+						RollStatus = 0;
 					}
-					// 输出和牌信息
-					
-					POINT hintinfo_pos = {120, 100};
-					HFONT hf = CreateMyFont(_T("楷体"), 48);
+
+					//-----------------------------显示庄家-------------------------------------
+					CString dealer_label = _T("Dealer");
+					HFONT hf = CreateMyFont(_T("华文新魏"), 24);
 					SelectObject(hdc, hf);
 					SetBkMode(hdc, TRANSPARENT);
 					SetTextColor(hdc, RGB(255, 174, 201));
-					TEXTMETRIC tm;
-					GetTextMetricsW(hdc, &tm);
-					hintbox_pos.x = 600;
-					hintbox_pos.y = 80;
-					RECT hintinfo_rect = {620, 100, 620 + 7 * tm.tmMaxCharWidth, 100 + tm.tmHeight * hint_info_lines};
-					ShowHintBox(hdc, hintbox_pos, 8 * tm.tmMaxCharWidth, tm.tmHeight * hint_info_lines + 40, 0, 200);
-					DrawTextW(hdc, hint_info, lstrlenW(hint_info), &hintinfo_rect, DT_TOP | DT_RIGHT);
-					//TextOut(hdc, hintinfo_pos.x, hintinfo_pos.y, hint_info, lstrlenW(hint_info));
+					hintbox_pos.x = ThisDealerLabelPos.x - 10;
+					hintbox_pos.y = ThisDealerLabelPos.y - 10;
+					ShowHintBox(hdc, hintbox_pos, 90, 45, RGB(255, 0, 0));
+					TextOutW(hdc, ThisDealerLabelPos.x, ThisDealerLabelPos.y, dealer_label, lstrlenW(dealer_label));
 					DeleteObject(hf);
+				
+					//-----------------------------显示分数与名称-------------------------------------
+					if (AllRobot)
+					{
+						hf = CreateMyFont(_T("华文中宋"), 24);
+						SelectObject(hdc, hf);
+						SetBkMode(hdc, TRANSPARENT);
+						SetTextColor(hdc, RGB(255, 255, 255));
+						for (int i = 0; i < 4; i++)
+						{
+							CString RobotInfoString = AllRobot[i].GetRobotName();
+							RobotInfoString.AppendFormat(_T("\n%6d"), AllRobot[i].GetPoints());
+							RECT RobotInfoRect = {RobotInfoPos[i].x, RobotInfoPos[i].y, RobotInfoPos[i].x + 100, RobotInfoPos[i].y + 80};
+							DrawTextW(hdc, RobotInfoString, lstrlenW(RobotInfoString), &RobotInfoRect, DT_TOP | DT_LEFT);
+							//TextOutW(hdc, RobotInfoPos[i].x, RobotInfoPos[i].y, RobotInfoString, lstrlenW(RobotInfoString));
+						}
+						DeleteObject(hf);
+					}
+				}
+				//-----------------------------------配牌阶段-------------------------------------
+				if (!get_all_tiles)
+				{
+					for (int i = 0; i < (showtilenum + 3) / 4; i++)
+						if (temptiles[i].get_tilesum() > 0)
+							temptiles[i].print_tiles(hdc, pai_pos[0].x + (4 * i) * (TILE_STRAIGHT_WIDTH + TILE_SPACE), pai_pos[0].y);
+				}
+				//----------------------------------配牌完成，开始打牌----------------------------------
+				else
+				{
+					//牌面打印
+					if (tileout_completed)
+					{
+						for (int seat = 0; seat < 4; seat++)
+						{
+							mypai[seat].print_tiles(hdc, pai_pos[seat], seat, PaiVisible[seat]/*seat != 0*/, tile_selected);
+							mypai[seat].print_river(hdc, paihe_pos[seat], seat);
+						}
+					}
+					else 
+					{
+						bool PrintNewTile = (match_info.frame_status == FRAME_NORMAL || FRAME_DRAW_NINE_ORPHANS || (match_info.frame_status == FRAME_WIN && match_info.active_direction == match_info.win_direction));
+						direction NewTileDirection = match_info.active_direction;
+						bool NewTile_visible = PaiVisible[NewTileDirection];
+						POINT NewTile_pos = pai_pos[NewTileDirection];
+						switch (NewTileDirection)
+						{
+						case east:
+							NewTile_pos.x += mypai[0].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE;
+							break;
+						case south:
+							NewTile_pos.y -= (mypai[1].get_tilesum()) * (TILE_ACROSS_SURFACE_HEIGHT + TILE_SPACE) + TILE_NEWSPACE;
+							break;
+						case west:
+							NewTile_pos.x -= mypai[2].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE;
+							break;
+						case north:
+							NewTile_pos.y += (mypai[3].get_tilesum()) * (TILE_ACROSS_SURFACE_HEIGHT + TILE_SPACE) + TILE_NEWSPACE;
+							break;
+						default:
+							break;
+						}
+						if (match_info.frame_status != FRAME_NORMAL)
+						{
+							NewTile.remove_tile_status(TILE_RECOMMEND);
+						}
+						if (match_info.active_direction != north && PrintNewTile)
+							NewTile.print_tiles(hdc, NewTile_pos, NewTileDirection, NewTile_visible, tile_selected - mypai[0].get_tilesum());
+						for (int seat = 0; seat < 4; seat++)
+						{
+							mypai[seat].print_tiles(hdc, pai_pos[seat], seat, PaiVisible[seat]/*seat != 0*/, tile_selected);
+							mypai[seat].print_river(hdc, paihe_pos[seat], seat);
+						}
+						if (match_info.active_direction == north && PrintNewTile)
+							NewTile.print_tiles(hdc, NewTile_pos, NewTileDirection, NewTile_visible, tile_selected - mypai[0].get_tilesum());
+					}
+					if (IfShowChiFuluHint)
+					{
+						hintbox_pos.x = pai_pos[0].x;
+						hintbox_pos.y = pai_pos[0].y - TILE_STRAIGHT_HEIGHT * 2;
+						ShowHintBox(hdc, hintbox_pos, 5 * TILE_STRAIGHT_WIDTH, TILE_STRAIGHT_HEIGHT * 1.5);
+						temptiles[0].print_tiles(hdc, hintbox_pos.x + TILE_STRAIGHT_WIDTH, hintbox_pos.y + TILE_STRAIGHT_HEIGHT * 0.25);
+					}
+					if (IfShowTenpaiHint)
+					{
+						hintbox_pos.x = pai_pos[0].x;
+						hintbox_pos.y = pai_pos[0].y - TILE_STRAIGHT_HEIGHT * 2;
+						ShowHintBox(hdc, hintbox_pos, (temptiles[1].get_tilesum() + 2) * TILE_STRAIGHT_WIDTH, TILE_STRAIGHT_HEIGHT * 1.5);
+						temptiles[1].print_tiles(hdc, hintbox_pos.x + TILE_STRAIGHT_WIDTH, hintbox_pos.y + TILE_STRAIGHT_HEIGHT * 0.25);
+					}
+					if (OneRoundForesee && match_info.active_direction == MySeat)
+					{
+						hintbox_pos.x = pai_pos[0].x + 13 * (TILE_STRAIGHT_WIDTH + TILE_SPACE);
+						hintbox_pos.y = pai_pos[0].y - TILE_STRAIGHT_HEIGHT * 1.5;
+						ShowHintBox(hdc, hintbox_pos, 3 * TILE_STRAIGHT_WIDTH, TILE_STRAIGHT_HEIGHT * 1.5, RGB(0, 255, 0));
+						temptiles[2].print_tiles(hdc, pai_pos[0].x + 14 * (TILE_STRAIGHT_WIDTH + TILE_SPACE), pai_pos[0].y - TILE_STRAIGHT_HEIGHT * 1.25);
+					}
+					if (IfShowChooseColumn) 
+						ShowChooseColumn(hdc, NowDlgWidth, ChooseColumnPos.y, ChooseFlags);
+					if (match_info.frame_status != FRAME_NORMAL && CutScenesType == None)
+					{
+						IfShowChooseColumn = false;
+						IfShowTenpaiHint = false;
+						CString hint_info;
+						int hint_info_lines = 1;
+						if (match_info.win_direction == noneed)
+						{
+							hint_info = _T("流局！");
+							if (!AllVisible) for (int seat = 0; seat < 4; PaiVisible[seat++] = mypai[seat].iftingpai());
+						}
+						else if (match_info.frame_status == FRAME_DRAW_MANGAN)
+						{
+							hint_info = _T("流局满贯！");
 
-					// 摊牌，宣告和牌
-					mypai[0].remove_tile_status(TILE_INVALID);
-					if (DebugMode)
-						frame_start = true;
-				}			
+						}
+						else
+						{
+						// 获取和牌的信息
+							if (!pHupaiInfo)
+							{
+								pHupaiInfo = new hupaiinfo;
+								//static hupaiinfo my_hupai_info;
+								BYTE HuFlags = 0;
+								HuFlags |= HU_RIICHI * ((WinPaiStatus & PAI_STATUS_RIICHI) != 0);
+								HuFlags |= HU_WRIICHI * ((WinPaiStatus & PAI_STATUS_WRIICHI) != 0);
+								HuFlags |= HU_IPPATSU * ((WinPaiStatus & PAI_STATUS_IPPATSU) != 0);
+								HuFlags |= HU_TENHOU * (match_info.tenhou_possible && match_info.win_direction == match_info.active_direction);
+								HuFlags |= HU_RINSHAN * ((WinPaiStatus & PAI_STATUS_RINSHAN) != 0);
+								HuFlags |= HU_HAITEI * (remaintiles.get_tilesum() == 4);
+								HuFlags |= HU_CHANKAN * match_info.chankan_possible;
+								HuFlags |= HU_TSUMO * (match_info.win_direction == match_info.active_direction);
+								//tempmypai.change_tilenum(match_info.active_tile, 1);
+								*pHupaiInfo = tempmypai.ifhu(match_info.active_tile, false, HuFlags, match_info, match_info.win_direction);
+							}
+							// 生成和牌信息的字符串
+							CString my_hupai_string;
+							int FanZhongLen = strlen(pHupaiInfo->fanzhong), HuTypeLen = strlen(pHupaiInfo->hutype);
+							int length = FanZhongLen + HuTypeLen;
+							CHAR* my_hupai_char = new CHAR[length + 1];
+							strcpy_s(my_hupai_char, FanZhongLen + 1, pHupaiInfo->fanzhong);
+							strcat_s(my_hupai_char, length + 1, pHupaiInfo->hutype);
+							WCHAR* my_hupai_wchar = new WCHAR[length + 1];
+							memset(my_hupai_wchar, 0, sizeof(WCHAR) * (length + 1));
+							MultiByteToWideChar(CP_ACP, 0, my_hupai_char, length, my_hupai_wchar, length);
+							for (int i = 0; i < wcslen(my_hupai_wchar); i++)
+								if (my_hupai_wchar[i] == ' ')
+								{
+									my_hupai_wchar[i] = '\n';
+									hint_info_lines ++;
+								}
+							my_hupai_string.Format(_T("%s"), my_hupai_wchar);
+							delete[] my_hupai_char;
+							delete[] my_hupai_wchar;
+							hint_info = my_hupai_string;
+						}
+						// 输出和牌信息
+					
+						HFONT hf = CreateMyFont(_T("楷体"), 48);
+						SelectObject(hdc, hf);
+						SetBkMode(hdc, TRANSPARENT);
+						SetTextColor(hdc, RGB(255, 174, 201));
+						TEXTMETRIC tm;
+						GetTextMetricsW(hdc, &tm);
+						hintbox_pos.x = NowDlgWidth / 2;
+						hintbox_pos.y = 80;
+						RECT hintinfo_rect = {hintbox_pos.x + 20, hintbox_pos.y + 20, hintbox_pos.x + 20 + 7 * tm.tmMaxCharWidth, hintbox_pos.y + 20 + tm.tmHeight * hint_info_lines};
+						ShowHintBox(hdc, hintbox_pos, 8 * tm.tmMaxCharWidth, tm.tmHeight * hint_info_lines + 40, 0, 200);
+						DrawTextW(hdc, hint_info, lstrlenW(hint_info), &hintinfo_rect, DT_TOP | DT_RIGHT);
+						DeleteObject(hf);
+
+						// 摊牌，宣告和牌
+						mypai[0].remove_tile_status(TILE_INVALID);
+						if (DebugMode)
+							frame_start = true;
+					}			
+				}
 			}
-		}
 		
+		}
+		break;
+	default:
+		break;
 	}
+	
 	if (IfShowCutScenes)
 	{
 		switch (CutScenesType)
@@ -648,7 +670,7 @@ void CMahjongSpiritDlg::OnPaint()
 		case CMahjongSpiritDlg::ShowAction:
 			// 显示特殊动作
 			{
-				ShowCutScenes(hdc, CutScenesDirection, CutRate, dlg_width, dlg_height);
+				ShowCutScenes(hdc, CutScenesDirection, CutRate, NowDlgWidth, NowDlgHeight);
 				if (CutRate > 4 && CutRate < 96)
 				{
 					CString ActionInfoText; 
@@ -684,7 +706,15 @@ void CMahjongSpiritDlg::OnPaint()
 					ActionInfoText.Format(_T("%s"), ActionName[ActionNo]);
 					COLORREF TextColor = RGB(75, 75, 128);
 					if ((CutRate > 40 && CutRate < 60) && (CutRate / 4) % 2 == 0) TextColor = RGB(0, 0, 0);
-					POINT ShowPos[5] = {{500, 575}, {1075, 300}, {500, 25}, {10, 300}, {500, 300}};
+					POINT ShowPos[5] = 
+					{
+						{NowDlgWidth / 2 - 100, NowDlgHeight - 100},
+						{NowDlgWidth - 125, NowDlgHeight / 2 - 38},
+						{NowDlgWidth / 2 - 100, 25},
+						{10, NowDlgHeight / 2 - 38},
+						{NowDlgWidth / 2 - 100, NowDlgHeight / 2 - 38}
+					};
+					//{{500, 575}, {1075, 300}, {500, 25}, {10, 300}, {500, 300}};
 					ShowTransparentText(hdc, ActionInfoText, _T("楷体"), 60, TextColor, ShowPos[CutScenesDirection], 100);
 				}
 			}
@@ -693,12 +723,12 @@ void CMahjongSpiritDlg::OnPaint()
 			// 显示当前局数
 			{
 				CImage BackImage;
-				CreateDefaultCutScenesImage(BackImage, 4, dlg_width, dlg_height);
+				CreateDefaultCutScenesImage(BackImage, 4, NowDlgWidth, NowDlgHeight);
 				double LoadRate = 0;
 				if (CutRate <= 4) LoadRate = (CutRate - 4) / 4.0;
 				if (CutRate >= 96) LoadRate = (CutRate - 96) / 4.0;
-				POINT ShowPos = {0, dlg_height / 2 - 100};
-				ShowCutScenes(hdc, BackImage, dlg_width, dlg_height, ShowPos, LoadRate, 0);
+				POINT ShowPos = {0, NowDlgHeight / 2 - 100};
+				ShowCutScenes(hdc, BackImage, NowDlgWidth, NowDlgHeight, ShowPos, LoadRate, 0);
 				if (CutRate > 4 && CutRate < 96)
 				{
 					CString MatchInfoText; 
@@ -708,7 +738,7 @@ void CMahjongSpiritDlg::OnPaint()
 					MatchInfoText.Format(_T("%s%s局"), MatchWindName[match_info.match_wind], NumName[match_info.game_num]);
 					COLORREF TextColor = RGB(75, 75, 128);
 					if ((CutRate > 40 && CutRate < 60) && (CutRate / 4) % 2 == 0) TextColor = RGB(0, 0, 0);
-					POINT MainShowPos = {500, 300}, ExtraShowPos = {700, 330};
+					POINT MainShowPos = {NowDlgWidth / 2 - 100, NowDlgHeight / 2 - 38}, ExtraShowPos = {NowDlgWidth / 2 + 100, NowDlgHeight / 2};
 					ShowTransparentText(hdc, MatchInfoText, _T("楷体"), 60, TextColor, MainShowPos, 100);
 					if (match_info.thisdealer_num > 0)
 					{
@@ -853,19 +883,19 @@ void CMahjongSpiritDlg::OnPaint()
 			// 显示结算的过场动画
 			{
 				CImage BackImage;
-				CreateDefaultCutScenesImage(BackImage, 4, dlg_width, dlg_height);
+				CreateDefaultCutScenesImage(BackImage, 4, NowDlgWidth, NowDlgHeight);
 				double LoadRate = 0;
 				if (CutRate <= 4) LoadRate = (CutRate - 4) / 4.0;
 				if (CutRate >= 96) LoadRate = (CutRate - 96) / 4.0;
-				POINT ShowPos = {0, dlg_height / 2 - 100};
-				ShowCutScenes(hdc, BackImage, dlg_width, dlg_height, ShowPos, LoadRate, 0);
+				POINT ShowPos = {0, NowDlgHeight / 2 - 100};
+				ShowCutScenes(hdc, BackImage, NowDlgWidth, NowDlgHeight, ShowPos, LoadRate, 0);
 				if (CutRate > 4 && CutRate < 96)
 				{
 					CString EndText = L"牌局结束，开始结算"; 
 			
 					COLORREF TextColor = RGB(75, 75, 128);
 					if ((CutRate > 40 && CutRate < 60) && (CutRate / 4) % 2 == 0) TextColor = RGB(0, 0, 0);
-					POINT MainShowPos = {500, 300}, ExtraShowPos = {700, 330};
+					POINT MainShowPos = {NowDlgWidth / 2 - 100, NowDlgHeight / 2 - 38};
 					ShowTransparentText(hdc, EndText, _T("楷体"), 60, TextColor, MainShowPos, 100);
 				}
 			}
@@ -879,7 +909,7 @@ void CMahjongSpiritDlg::OnPaint()
 	{
 		CString PointString;
 		PointString.Format(_T("(%4ld, %4ld)"), MousePoint.x, MousePoint.y);
-		POINT MousePointBox = {485, 275};
+		POINT MousePointBox = {NowDlgWidth / 2 - 115, NowDlgHeight / 2 - 63};
 		HFONT hf = CreateMyFont(_T("Times New Roman"), 48);
 		SelectObject(hdc, hf);
 		SetBkMode(hdc, TRANSPARENT);
@@ -889,13 +919,20 @@ void CMahjongSpiritDlg::OnPaint()
 		CString PointColorString;
 		COLORREF PointColor = GetPixel(hdc, MousePoint.x, MousePoint.y);
 		PointColorString.Format(_T("(%3d, %3d, %3d)"), GetRValue(PointColor), GetGValue(PointColor), GetBValue(PointColor));
-		POINT PointColorBox = {450, 375};
+		POINT PointColorBox = {NowDlgWidth / 2 - 150, MousePointBox.y + 100};
 		ShowHintBox(hdc, PointColorBox, 280, 65, 0);
 		TextOutW(hdc, PointColorBox.x + 10, PointColorBox.y + 10, PointColorString, lstrlenW(PointColorString));
 		DeleteObject(hf);
 	}
 	if (IfShowMarks)
 	{
+		int MarksBoxWidth = NowDlgWidth / 2;
+		int MarksBoxHeight = MarksBoxWidth * 2 / 3;
+		MarksBoxSize.left = (NowDlgWidth - MarksBoxWidth) / 2;
+		MarksBoxSize.right = (NowDlgWidth + MarksBoxWidth) / 2;
+		MarksBoxSize.top = (NowDlgHeight - MarksBoxHeight) / 2;
+		MarksBoxSize.bottom = (NowDlgHeight + MarksBoxHeight) / 2;
+
 		HFONT hf = CreateMyFont(_T("华文中宋"), 24);
 		SelectObject(hdc, hf);
 		HPEN hp = CreatePen(PS_DASH, 2, RGB(255, 255, 255));
@@ -907,7 +944,7 @@ void CMahjongSpiritDlg::OnPaint()
 		POINT MarksBoxPos = {MarksBoxSize.left, MarksBoxSize.top};
 		ShowHintBox(hdc, MarksBoxPos, MarksBoxSize.right - MarksBoxSize.left, MarksBoxSize.bottom - MarksBoxSize.top, 0, 200);
 		
-		int WhiteLineY = 200;
+		int WhiteLineY = NowDlgHeight / 2 - 138;
 		int LeftRightBlank = 50;
 		MoveToEx(hdc, MarksBoxSize.left + LeftRightBlank, WhiteLineY, NULL);
 		LineTo(hdc, MarksBoxSize.right - LeftRightBlank, WhiteLineY);
@@ -915,9 +952,9 @@ void CMahjongSpiritDlg::OnPaint()
 		for (int i = 0; i < 4; i ++)
 		{
 			CString NameString = AllRobot[i].GetRobotName();
-			RECT NameStringRect = {MarksBoxSize.left + LeftRightBlank + i * BlankWidth / 4, MarksBoxSize.top + 30,
+			RECT NameStringRect = {MarksBoxSize.left + LeftRightBlank + i * BlankWidth / 4, (MarksBoxSize.top + WhiteLineY) / 2,
 				MarksBoxSize.left + LeftRightBlank + (i + 1) * BlankWidth / 4, WhiteLineY};
-			DrawTextW(hdc, NameString, lstrlenW(NameString), &NameStringRect, DT_TOP | DT_CENTER);
+			DrawTextW(hdc, NameString, lstrlenW(NameString), &NameStringRect, DT_VCENTER | DT_CENTER);
 		}
 		DeleteObject(hf);
 		SelectObject(hdc, hf);
@@ -947,16 +984,16 @@ void CMahjongSpiritDlg::OnPaint()
 		DeleteObject(hp);
 	}
 
-	//将内存中的图拷贝到屏幕上进行显示
-	if (mahjong_start)
-		//pCDC->StretchBlt(0, 0, NowDlgWidth, NowDlgHeight, &MemDC, 0, 0, dlg_width, dlg_height, SRCCOPY);
-		pCDC->BitBlt(0, 0, NowDlgWidth, NowDlgHeight, &MemDC, 0, 0, SRCCOPY);
+	DlgResize = false;
+
+	pCDC->BitBlt((RealDlgWidth - NowDlgWidth) / 2, (RealDlgHeight - NowDlgHeight) / 2, NowDlgWidth, NowDlgHeight, &MemDC, 0, 0, SRCCOPY);
 		
 	//绘图完成后的清理
 	MemDC.SelectObject(pOldBitmap);
 	MemBitmap.DeleteObject();
 	MemDC.DeleteDC();
 	ReleaseDC(pCDC);
+
 }
 
 UINT AnalysisThreadProc(LPVOID pParam)
@@ -1013,32 +1050,6 @@ HCURSOR CMahjongSpiritDlg::OnQueryDragIcon()
 }
 
 
-void CMahjongSpiritDlg::OnBnClickedStart()
-{
-	// TODO: 在此添加控件通知处理程序代码
-	ifshowcover = true;
-	Invalidate();
-}
-
-
-void CMahjongSpiritDlg::OnStnClickedBtnstart()
-{
-	// TODO: 在此添加控件通知处理程序代码
-	if (!login_succeed)
-	{
-		CLoginDlg logindlg;
-		INT_PTR login_result = logindlg.DoModal();
-		if (login_result == IDOK)
-		{
-			KillTimer(2);
-			ifshowwelcome = true;
-			hintpic_alpha = 0;
-			SetTimer(3, 75, NULL);
-			login_succeed = true;
-		}
-	}
-}
-
 
 void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 {
@@ -1047,15 +1058,17 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 	{
 	case 1:
 		{
-			KillTimer(1);
-			//SetTimer(2, 75, NULL);
-			login_succeed = true;
-			ready_enter = true;
-			ifshowwelcome = false;
-			ifshowcover = false;
-			enter_rate = 0;
-			SetTimer(4, 50, NULL);
-			Invalidate();
+			if (NoNeedLogin)
+			{
+				KillTimer(1);
+				login_succeed = true;
+				ShowType = CMahjongSpiritDlg::ReadyEnter;
+				enter_rate = 0;
+				SetTimer(4, 50, NULL);
+			}
+			else
+				SetTimer(2, 75, NULL);
+			Invalidate(false);
 		}
 		break;
 	case 2:
@@ -1068,10 +1081,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 				startbtn_alpha += 10;
 			else
 				startbtn_alpha -= 10;
-			RECT startbtn_rect;
-			GetDlgItem(ID_BTNSTART)->GetWindowRect(&startbtn_rect);
-			this->ScreenToClient(&startbtn_rect);
-			InvalidateRect(&startbtn_rect, false);
+			InvalidateRect(&StartBtn, false);
 		}
 		break;
 	case 3:
@@ -1080,16 +1090,11 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 			if (hintpic_alpha > 240)
 			{
 				KillTimer(3);
-				ready_enter = true;
-				ifshowwelcome = false;
-				ifshowcover = false;
+				ShowType = CMahjongSpiritDlg::ReadyEnter;
 				enter_rate = 0;
 				SetTimer(4, 50, NULL);
 			}
-			RECT hintpic_rect;
-			GetDlgItem(IDC_HINTPIC)->GetWindowRect(&hintpic_rect);
-			this->ScreenToClient(&hintpic_rect);
-			InvalidateRect(&hintpic_rect, false);
+			Invalidate(false);
 		}
 		break;
 	case 4:
@@ -1098,10 +1103,8 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 			if (enter_rate == 100)
 			{
 				KillTimer(4);
-				ready_enter = false;
-				mahjong_start = true;
+				ShowType = CMahjongSpiritDlg::MahjongStart;
 				SetTimer(6, 50, NULL);
-				//showtilenum = 0;
 			}
 			else
 				Invalidate(false);
@@ -1128,7 +1131,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 		break;
 	case 6:
 		{
-			if (mahjong_start && (CutScenesType == None || CutScenesType == ScenesEnd))
+			if (ShowType == CMahjongSpiritDlg::MahjongStart && (CutScenesType == None || CutScenesType == ScenesEnd))
 			{
 				static MahjongRobot robot[4];
 				static bool win = false;
@@ -1742,7 +1745,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 									if (match_info.OpenQuadRenShanFlag && MyTiles == RinShanTiles)
 									{
 										gettile = RinShanTileGet[RinShanTileNum++];
-										if (RinShanTileNum == 3) RinShanTileNum == 0;
+										if (RinShanTileNum == 3) RinShanTileNum = 0;
 									}
 									temptiles[2].reset_all();
 									temptiles[2].change_tilenum(next_gettile, 1);
@@ -2493,7 +2496,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 									for (int FuluIndex = 0; FuluIndex < tempmypai.get_fulusum(); FuluIndex ++)
 									{
 										fulugroup tempGroup = tempmypai.get_fulu(FuluIndex);
-										if (tempGroup.thistype == ke && tempmypai.get_tilenum(tempGroup.keytype, tempGroup.key) == 1)
+										if (tempGroup.thistype == ke && FinalKanTile.type == tempGroup.keytype && FinalKanTile.num == tempGroup.key)
 											FinalPlusKanFuluIndex = FuluIndex;
 									}
 									if (FinalPlusKanFuluIndex == -1)
@@ -2628,26 +2631,29 @@ void CMahjongSpiritDlg::OnMouseMove(UINT nFlags, CPoint point)
 	if (DrawMode)
 	{
 		MousePoint = point;
-		RECT tempRect = {450, 275, 730, 440};
+		RECT tempRect = {NowDlgWidth / 2 - 150, NowDlgHeight / 2 - 63, NowDlgWidth / 2 + 130, NowDlgHeight / 2 + 102};
 		InvalidateRect(&tempRect, false);
 	}
 	else if (IfShowMarks)
 	{
 		InvalidateRect(&MarksBoxSize, false);
 	}
-	else if (mahjong_start && get_all_tiles)
+	else if (ShowType == CMahjongSpiritDlg::MahjongStart && get_all_tiles)
 	{
 		static int old_tile_selected = -1;
 		static bool clear_selected = false;
 		old_tile_selected = tile_selected;
-		if (point.x > pai_pos[0].x && point.x < pai_pos[0].x + mypai[0].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE)
-			&& point.y > pai_pos[0].y && point.y < pai_pos[0].y + TILE_STRAIGHT_HEIGHT)
+		POINT MyPaiPos = pai_pos[0];
+		MyPaiPos.x += (RealDlgWidth - NowDlgWidth) / 2;
+		MyPaiPos.y += (RealDlgHeight - NowDlgHeight) / 2;
+		if (point.x > MyPaiPos.x && point.x < MyPaiPos.x + mypai[0].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE)
+			&& point.y > MyPaiPos.y && point.y < MyPaiPos.y + TILE_STRAIGHT_HEIGHT)
 		{
-			tile_selected = (point.x - pai_pos[0].x) / (TILE_STRAIGHT_WIDTH + TILE_SPACE);
+			tile_selected = (point.x - MyPaiPos.x) / (TILE_STRAIGHT_WIDTH + TILE_SPACE);
 		}
-		else if(point.x > pai_pos[0].x + mypai[0].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE
-			&& point.x < pai_pos[0].x + (mypai[0].get_tilesum() + 1) * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE
-			&& point.y > pai_pos[0].y && point.y < pai_pos[0].y + TILE_STRAIGHT_HEIGHT)
+		else if(point.x > MyPaiPos.x + mypai[0].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE
+			&& point.x < MyPaiPos.x + (mypai[0].get_tilesum() + 1) * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE
+			&& point.y > MyPaiPos.y && point.y < MyPaiPos.y + TILE_STRAIGHT_HEIGHT)
 			tile_selected = mypai[0].get_tilesum();
 		else
 			tile_selected = -1;
@@ -2655,18 +2661,18 @@ void CMahjongSpiritDlg::OnMouseMove(UINT nFlags, CPoint point)
 		{
 			clear_selected = false;
 			RECT tempRect;
-			tempRect.left = pai_pos[0].x + old_tile_selected * (TILE_STRAIGHT_WIDTH + TILE_SPACE);
-			tempRect.top = pai_pos[0].y - TILE_SELECTED_UP;
-			tempRect.right = pai_pos[0].x + (old_tile_selected + 1) * (TILE_STRAIGHT_WIDTH + TILE_SPACE);
-			tempRect.bottom = pai_pos[0].y + TILE_STRAIGHT_HEIGHT;
+			tempRect.left = MyPaiPos.x + old_tile_selected * (TILE_STRAIGHT_WIDTH + TILE_SPACE);
+			tempRect.top = MyPaiPos.y - TILE_SELECTED_UP;
+			tempRect.right = MyPaiPos.x + (old_tile_selected + 1) * (TILE_STRAIGHT_WIDTH + TILE_SPACE);
+			tempRect.bottom = MyPaiPos.y + TILE_STRAIGHT_HEIGHT;
 			if (match_info.active_direction == MySeat) OnTimer(6);
 			InvalidateRect(&tempRect, false);
 			if (tile_selected != -1)
 			{
-				tempRect.left = pai_pos[0].x + tile_selected * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE * (tile_selected == mypai[0].get_tilesum());
-				tempRect.top = pai_pos[0].y - TILE_SELECTED_UP;
-				tempRect.right = pai_pos[0].x + (tile_selected + 1) * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE * (tile_selected == mypai[0].get_tilesum());
-				tempRect.bottom = pai_pos[0].y + TILE_STRAIGHT_HEIGHT;
+				tempRect.left = MyPaiPos.x + tile_selected * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE * (tile_selected == mypai[0].get_tilesum());
+				tempRect.top = MyPaiPos.y - TILE_SELECTED_UP;
+				tempRect.right = MyPaiPos.x + (tile_selected + 1) * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE * (tile_selected == mypai[0].get_tilesum());
+				tempRect.bottom = MyPaiPos.y + TILE_STRAIGHT_HEIGHT;
 				InvalidateRect(&tempRect, false);
 			}
 		}
@@ -2674,10 +2680,10 @@ void CMahjongSpiritDlg::OnMouseMove(UINT nFlags, CPoint point)
 		{
 			clear_selected = true;
 			RECT tempRect;
-			tempRect.left = pai_pos[0].x;
-			tempRect.top = pai_pos[0].y - TILE_SELECTED_UP;
-			tempRect.right = pai_pos[0].x + (mypai[0].get_tilesum() + 1) * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE;
-			tempRect.bottom = pai_pos[0].y;
+			tempRect.left = MyPaiPos.x;
+			tempRect.top = MyPaiPos.y - TILE_SELECTED_UP;
+			tempRect.right = MyPaiPos.x + (mypai[0].get_tilesum() + 1) * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE;
+			tempRect.bottom = MyPaiPos.y;
 			InvalidateRect(&tempRect, false);
 		}
 		//Invalidate();
@@ -2693,7 +2699,7 @@ void CMahjongSpiritDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	if (DrawMode)
 	{
 		MousePoint = point;
-		RECT tempRect = {450, 275, 730, 440};
+		RECT tempRect = {NowDlgWidth / 2 - 150, NowDlgHeight / 2 - 63, NowDlgWidth / 2 + 130, NowDlgHeight / 2 + 102};
 		InvalidateRect(&tempRect, false);
 	}
 	else if (IfShowMarks)
@@ -2705,55 +2711,78 @@ void CMahjongSpiritDlg::OnLButtonDown(UINT nFlags, CPoint point)
 		IfShowMarks = false;
 		InvalidateRect(NULL, false);
 	}
-	else
+	else if (ShowType == CMahjongSpiritDlg::ShowCover)
 	{
-		if (mahjong_start && match_info.frame_status == FRAME_NORMAL && get_all_tiles && CutScenesType == None)
+		if (point.x < StartBtn.right && point.x > StartBtn.left && point.y < StartBtn.bottom && point.y > StartBtn.top)
 		{
-			if (point.x > pai_pos[0].x && point.x < pai_pos[0].x + mypai[0].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE)
-				&& point.y > pai_pos[0].y && point.y < pai_pos[0].y + TILE_STRAIGHT_HEIGHT)
+			if (!login_succeed)
 			{
-				tile_out = (point.x - pai_pos[0].x) / (TILE_STRAIGHT_WIDTH + TILE_SPACE);
+				CLoginDlg logindlg;
+				INT_PTR login_result = logindlg.DoModal();
+				if (login_result == IDOK)
+				{
+					KillTimer(2);
+					ShowType = CMahjongSpiritDlg::ShowWelcome;
+					hintpic_alpha = 0;
+					SetTimer(3, 75, NULL);
+					login_succeed = true;
+				}
+			}
+		}
+	}
+	else if (ShowType == CMahjongSpiritDlg::MahjongStart)
+	{
+		POINT MyPaiPos = pai_pos[0];
+		MyPaiPos.x += (RealDlgWidth - NowDlgWidth) / 2;
+		MyPaiPos.y += (RealDlgHeight - NowDlgHeight) / 2;
+		if (match_info.frame_status == FRAME_NORMAL && get_all_tiles && CutScenesType == None)
+		{
+			if (point.x > MyPaiPos.x && point.x < MyPaiPos.x + mypai[0].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE)
+				&& point.y > MyPaiPos.y && point.y < MyPaiPos.y + TILE_STRAIGHT_HEIGHT)
+			{
+				tile_out = (point.x - MyPaiPos.x) / (TILE_STRAIGHT_WIDTH + TILE_SPACE);
 				if (Choosing)
 					FinalChoice = -1;
 				RECT tempRect;
-				tempRect.left = pai_pos[0].x + tile_out * (TILE_STRAIGHT_WIDTH + TILE_SPACE);
-				tempRect.top = pai_pos[0].y - TILE_SELECTED_UP;
-				tempRect.right = pai_pos[0].x + mypai[0].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE);
-				tempRect.bottom = pai_pos[0].y;
+				tempRect.left = MyPaiPos.x + tile_out * (TILE_STRAIGHT_WIDTH + TILE_SPACE);
+				tempRect.top = MyPaiPos.y - TILE_SELECTED_UP;
+				tempRect.right = MyPaiPos.x + mypai[0].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE);
+				tempRect.bottom = MyPaiPos.y;
 				InvalidateRect(&tempRect, false);
 			}
-			else if(point.x > pai_pos[0].x + mypai[0].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE
-				&& point.x < pai_pos[0].x + (mypai[0].get_tilesum() + 1) * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE
-				&& point.y > pai_pos[0].y && point.y < pai_pos[0].y + TILE_STRAIGHT_HEIGHT)
+			else if(point.x > MyPaiPos.x + mypai[0].get_tilesum() * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE
+				&& point.x < MyPaiPos.x + (mypai[0].get_tilesum() + 1) * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE
+				&& point.y > MyPaiPos.y && point.y < MyPaiPos.y + TILE_STRAIGHT_HEIGHT)
 			{
 				tile_out = mypai[0].get_tilesum();
 				if (Choosing)
 					FinalChoice = -1;
 				RECT tempRect;
-				tempRect.left = pai_pos[0].x + (tile_out - 1) * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE;
-				tempRect.top = pai_pos[0].y - TILE_SELECTED_UP;
-				tempRect.right = pai_pos[0].x + tile_out * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE;
-				tempRect.bottom = pai_pos[0].y;
+				tempRect.left = MyPaiPos.x + (tile_out - 1) * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE;
+				tempRect.top = MyPaiPos.y - TILE_SELECTED_UP;
+				tempRect.right = MyPaiPos.x + tile_out * (TILE_STRAIGHT_WIDTH + TILE_SPACE) + TILE_NEWSPACE;
+				tempRect.bottom = MyPaiPos.y;
 				InvalidateRect(&tempRect, false);
 			}
 			else
 			{
 				if (Choosing)
 				{
-					if (point.y > ChooseColumnPos.y && point.y < ChooseColumnPos.y + CHOOSE_COLUMN_HEIGHT)
+					if (point.y > ChooseColumnPos.y + (RealDlgHeight - NowDlgHeight) / 2 
+						&& point.y < ChooseColumnPos.y + (RealDlgHeight - NowDlgHeight) / 2 + CHOOSE_COLUMN_HEIGHT)
 					{
 						CDC* pDC = GetDC();
 						COLORREF ClickPosColor = pDC->GetPixel(point);
 				
 						if (ClickPosColor == CHOOSE_BUTTON_COLOR || ClickPosColor == CHOOSE_TEXT_COLOR)
 						{
-							if (point.x > dlg_width - 2.5 * CHOOSE_BUTTON_WIDTH)
+							if (point.x > NowDlgWidth + (RealDlgWidth - NowDlgWidth) / 2 - 2.5 * CHOOSE_BUTTON_WIDTH)
 								FinalChoice = -1;
 							else
 							{
 								for (int i = 0; i < 5; i++)
-									if (point.x < dlg_width - (3.5 + 1.5 * i) * CHOOSE_BUTTON_WIDTH
-										&& point.x > dlg_width - (4.5 + 1.5 * i) * CHOOSE_BUTTON_WIDTH)
+									if (point.x < NowDlgWidth + (RealDlgWidth - NowDlgWidth) / 2 - (3.5 + 1.5 * i) * CHOOSE_BUTTON_WIDTH
+										&& point.x > NowDlgWidth + (RealDlgWidth - NowDlgWidth) / 2 - (4.5 + 1.5 * i) * CHOOSE_BUTTON_WIDTH)
 									FinalChoice = i + 1;
 							}
 						}
@@ -2943,6 +2972,9 @@ void CMahjongSpiritDlg::UpdateRules(bool FromMain)
 void CMahjongSpiritDlg::OnSize(UINT nType, int cx, int cy)
 {
 	CDialogEx::OnSize(nType, cx, cy);
+	// TODO: 在此处添加消息处理程序代码
+	RealDlgWidth = cx;
+	RealDlgHeight = cy;
 	NowDlgWidth = cx;
 	NowDlgHeight = cy;
 	
@@ -2962,7 +2994,6 @@ void CMahjongSpiritDlg::OnSize(UINT nType, int cx, int cy)
 		pCDC->SetMapMode(MM_ISOTROPIC);
 		ReleaseDC(pCDC);
 	}
-
-	// TODO: 在此处添加消息处理程序代码
-
+	DlgResize = true;
+	Invalidate(true);
 }
