@@ -49,8 +49,11 @@ public:
 
 	CStatic m_coverpic;				//封面图片
 	LPPICTURE m_pPicture;			//图片
-	int dlg_width;					//窗口宽度
-	int dlg_height;					//窗口高度
+	int dlg_width;					//窗口初始宽度
+	int dlg_height;					//窗口初始高度
+	int NowDlgWidth;				//窗口当前宽度
+	int NowDlgHeight;				//窗口当前高度
+
 	bool ifshowcover;				//是否显示封面
 	
 	unsigned char startbtn_alpha;		//开始按钮透明度
@@ -162,4 +165,5 @@ public:
 	afx_msg void OnGamesettingMarks();
 	afx_msg void OnGamesettingReset();
 	void UpdateRules(bool FromMain);
+	afx_msg void OnSize(UINT nType, int cx, int cy);
 };

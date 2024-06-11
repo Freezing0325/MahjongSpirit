@@ -22,6 +22,7 @@
 //20240610_1752：实现了牌局的结束与重置，实现了计分，实现了大部分规则，但是局末时有时候会出现出黑牌，机制不明。九种九牌流局、大明杠包牌以及流局满贯尚未实现。
 //20240610_2307：实现了九种九牌流局和流局满贯，修复了一些BUG。胜利就在眼前。
 //20240611_0221：实现了大明杠包牌的机制，所有规则均可实现。接下来进行实际测试。自己开暗杠与加杠没有动画显示，此前可能忘记搬运了。
+//20240611_1220：实现了开暗杠和加杠的动画显示。接下来要进行窗口大小的调整。
 
 #include "stdafx.h"
 
@@ -146,6 +147,7 @@ BEGIN_MESSAGE_MAP(CMahjongSpiritDlg, CDialogEx)
 	ON_COMMAND(ID_GAMESETTING_RULES, &CMahjongSpiritDlg::OnGamesettingRules)
 	ON_COMMAND(ID_GAMESETTING_MARKS, &CMahjongSpiritDlg::OnGamesettingMarks)
 	ON_COMMAND(ID_GAMESETTING_RESET, &CMahjongSpiritDlg::OnGamesettingReset)
+	ON_WM_SIZE()
 END_MESSAGE_MAP()
 
 
@@ -166,9 +168,11 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	GetClientRect(&client_rect);
 	dlg_width = client_rect.right - client_rect.left;
 	dlg_height = client_rect.bottom - client_rect.top;
+	NowDlgWidth = dlg_width;
+	NowDlgHeight = dlg_height;
 
-	int MarksBoxWidth = 600;
-	int MarksBoxHeight = 400;
+	int MarksBoxWidth = dlg_width / 2;
+	int MarksBoxHeight = MarksBoxWidth * 2 / 3;
 	MarksBoxSize.left = (dlg_width - MarksBoxWidth) / 2;
 	MarksBoxSize.right = (dlg_width + MarksBoxWidth) / 2;
 	MarksBoxSize.top = (dlg_height - MarksBoxHeight) / 2;
@@ -221,65 +225,66 @@ void GetTableImage(CImage& TableImage, int dlg_width, int dlg_height)
 	const int InnerFrameLen = 70;
 	const int LeanFrameLen = (OutFrameLen - InnerFrameLen) / 2;
 	const POINT StartPos = {480, 190};
-
-	POINT ThisPos = StartPos;
-	MoveToEx(hTableDC, ThisPos.x, ThisPos.y, NULL);
-	ThisPos.x += OutFrameLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.y += AngleSquareLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.x += AngleSquareLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.y += OutFrameLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.x -= AngleSquareLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.y += AngleSquareLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.x -= OutFrameLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.y -= AngleSquareLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.x -= AngleSquareLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.y -= OutFrameLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.x += AngleSquareLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.y -= AngleSquareLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.y += AngleSquareLen;
-	MoveToEx(hTableDC, ThisPos.x, ThisPos.y, NULL);
-	ThisPos.x += LeanFrameLen;
-	ThisPos.y += LeanFrameLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.x += InnerFrameLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.x += LeanFrameLen;
-	ThisPos.y -= LeanFrameLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.x -= LeanFrameLen;
-	ThisPos.y += LeanFrameLen;
-	MoveToEx(hTableDC, ThisPos.x, ThisPos.y, NULL);
-	ThisPos.y += InnerFrameLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.x += LeanFrameLen;
-	ThisPos.y += LeanFrameLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.x -= LeanFrameLen;
-	ThisPos.y -= LeanFrameLen;
-	MoveToEx(hTableDC, ThisPos.x, ThisPos.y, NULL);
-	ThisPos.x -= InnerFrameLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.x -= LeanFrameLen;
-	ThisPos.y += LeanFrameLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-	ThisPos.x += LeanFrameLen;
-	ThisPos.y -= LeanFrameLen;
-	MoveToEx(hTableDC, ThisPos.x, ThisPos.y, NULL);
-	ThisPos.y -= InnerFrameLen;
-	LineTo(hTableDC, ThisPos.x, ThisPos.y);
-
+	// 画中心的复杂图形
+	{
+		POINT ThisPos = StartPos;
+		MoveToEx(hTableDC, ThisPos.x, ThisPos.y, NULL);
+		ThisPos.x += OutFrameLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.y += AngleSquareLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.x += AngleSquareLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.y += OutFrameLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.x -= AngleSquareLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.y += AngleSquareLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.x -= OutFrameLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.y -= AngleSquareLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.x -= AngleSquareLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.y -= OutFrameLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.x += AngleSquareLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.y -= AngleSquareLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.y += AngleSquareLen;
+		MoveToEx(hTableDC, ThisPos.x, ThisPos.y, NULL);
+		ThisPos.x += LeanFrameLen;
+		ThisPos.y += LeanFrameLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.x += InnerFrameLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.x += LeanFrameLen;
+		ThisPos.y -= LeanFrameLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.x -= LeanFrameLen;
+		ThisPos.y += LeanFrameLen;
+		MoveToEx(hTableDC, ThisPos.x, ThisPos.y, NULL);
+		ThisPos.y += InnerFrameLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.x += LeanFrameLen;
+		ThisPos.y += LeanFrameLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.x -= LeanFrameLen;
+		ThisPos.y -= LeanFrameLen;
+		MoveToEx(hTableDC, ThisPos.x, ThisPos.y, NULL);
+		ThisPos.x -= InnerFrameLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.x -= LeanFrameLen;
+		ThisPos.y += LeanFrameLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+		ThisPos.x += LeanFrameLen;
+		ThisPos.y -= LeanFrameLen;
+		MoveToEx(hTableDC, ThisPos.x, ThisPos.y, NULL);
+		ThisPos.y -= InnerFrameLen;
+		LineTo(hTableDC, ThisPos.x, ThisPos.y);
+	}
 	DeleteObject(hp);
 	TableImage.ReleaseDC();
 }
@@ -358,8 +363,6 @@ void CMahjongSpiritDlg::OnPaint()
 		HDC hNextDC;
 		if (nextSurface.IsNull())
 		{
-			//LoadImageFromResource(nextSurface, IDB_PNG_TABLE, _T("PNG"));
-			//nextSurface.Load(_T("麻将桌.png"));
 			GetTableImage(nextSurface, dlg_width, dlg_width);
 		}
 		ChangeSurface(GetDlgItem(IDC_COVERPIC), lastSurface, nextSurface, enter_rate);
@@ -375,8 +378,6 @@ void CMahjongSpiritDlg::OnPaint()
 	//双缓冲技术
 	CRect rc;				
 	GetClientRect(&rc);
-	int nWidth = rc.Width();  
-	int nHeight = rc.Height();   
 	CDC *pCDC = GetDC();		//定义设备上下文
 		
 	CDC MemDC;					//定义一个内存显示设备对象
@@ -384,23 +385,23 @@ void CMahjongSpiritDlg::OnPaint()
 	//建立与屏幕显示兼容的内存显示设备
 	MemDC.CreateCompatibleDC(pCDC);
 	//建立一个与屏幕显示兼容的位图，位图的大小可选用窗口客户区的大小
-	MemBitmap.CreateCompatibleBitmap(pCDC, nWidth, nHeight);
+	MemBitmap.CreateCompatibleBitmap(pCDC, NowDlgWidth, NowDlgHeight);
 	//将位图选入到内存显示设备中，只有选入了位图的内存显示设备才有地方绘图，画到指定的位图上
 	CBitmap *pOldBitmap = MemDC.SelectObject(&MemBitmap);
-	//MemDC.FillSolidRect(0,0,nWidth,nHeight,RGB(255,255,255));
+	MemDC.FillSolidRect(0,0, NowDlgWidth, NowDlgHeight,0);
 	HDC hdc = MemDC.GetSafeHdc();
 
 	if (mahjong_start)
 	{
 		//加载牌桌
-		static CImage tableimage;
-		if (tableimage.IsNull())
+		static CImage TableImage;
+		if (TableImage.IsNull())
 		{
 			//LoadImageFromResource(tableimage, IDB_PNG_TABLE, _T("PNG"));
 			//tableimage.Load(_T("麻将桌.png"));
-			GetTableImage(tableimage, dlg_width, dlg_width);
+			GetTableImage(TableImage, NowDlgWidth, NowDlgHeight);
 		}
-		tableimage.BitBlt(hdc, 0, 0, SRCCOPY);
+		TableImage.BitBlt(hdc, 0, 0, SRCCOPY);
 		POINT hintbox_pos = {0, 0};
 		
 		pai_pos[0].x = 260;
@@ -874,7 +875,6 @@ void CMahjongSpiritDlg::OnPaint()
 		}
 		
 	}
-
 	if (DrawMode)
 	{
 		CString PointString;
@@ -949,7 +949,8 @@ void CMahjongSpiritDlg::OnPaint()
 
 	//将内存中的图拷贝到屏幕上进行显示
 	if (mahjong_start)
-		pCDC->BitBlt(0, 0, nWidth, nHeight, &MemDC, 0, 0, SRCCOPY);
+		//pCDC->StretchBlt(0, 0, NowDlgWidth, NowDlgHeight, &MemDC, 0, 0, dlg_width, dlg_height, SRCCOPY);
+		pCDC->BitBlt(0, 0, NowDlgWidth, NowDlgHeight, &MemDC, 0, 0, SRCCOPY);
 		
 	//绘图完成后的清理
 	MemDC.SelectObject(pOldBitmap);
@@ -2171,15 +2172,17 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 										static bool GetKanInfo = false;
 										static bool ChooseKan = false;
 										int FinalKanIndex = 0;
-										int FinalPlusKanFuluIndex = -1;
+										// 获取开杠的信息，如哪些牌可开杠，加杠还是暗杠
 										if (!GetKanInfo)
 										{
+											PossibleKanSum = 0;
 											for (int type_num = 0; type_num < 37; type_num ++)
 											{
 												if (type_num % 10 == 9) continue;
 												if (tempmypai.get_tilenum(type_num / 10, type_num % 10) == 4)
 												{
 													bool KanValid = true;
+													// 如果立直，则暗杠不能改变听牌
 													if ((robot[0].get_paistatus() & PAI_STATUS_RIICHI) != 0)
 													{
 														pai AfterKan_mypai(mypai[0]), BeforeKan_mypai(mypai[0]);
@@ -2217,17 +2220,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 												}
 											}
 											GetKanInfo = true;
-											if (PossibleKanSum == 1)
-											{
-												if (PlusKan != 0)
-													for (int FuluIndex = 0; FuluIndex < tempmypai.get_fulusum(); FuluIndex ++)
-													{
-														fulugroup tempGroup = tempmypai.get_fulu(FuluIndex);
-														if (tempGroup.thistype == ke && tempmypai.get_tilenum(tempGroup.keytype, tempGroup.key) == 1)
-															FinalPlusKanFuluIndex = FuluIndex;
-													}
-											}
-											else
+											if (PossibleKanSum > 1)
 											{
 												ChooseKan = true;
 												for (int type_num = 0; type_num < 37; type_num ++)
@@ -2256,101 +2249,42 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 											}
 											if (tile_out != -1)
 											{
+												singletile kan_singletile = defaulttile;
+												pai* pKanTileFrom = nullptr;
 												if (tile_out == mypai[0].get_tilesum())
 												{
-													singletile kan_singletile = NewTile.get_ordertile(0);
-													if (!(NewTile.get_tile_status(kan_singletile) & TILE_INVALID))
-													{
-														for (int i = 0; i < PossibleKanSum; i++)
-															if (kan_singletile == PossibleKanTiles[i])
-																FinalKanIndex = i;
-														if (PlusKan & (1 << FinalKanIndex))
-															for (int FuluIndex = 0; FuluIndex < tempmypai.get_fulusum(); FuluIndex ++)
-															{
-																fulugroup tempGroup = tempmypai.get_fulu(FuluIndex);
-																if (tempGroup.thistype == ke && tempmypai.get_tilenum(tempGroup.keytype, tempGroup.key) == 1)
-																	FinalPlusKanFuluIndex = FuluIndex;
-															}
-														ChooseKan = false;
-													}
+													kan_singletile = NewTile.get_ordertile(0);
+													pKanTileFrom = &NewTile;
 												}
-												else	//从手牌中切出
+												else
 												{
-													singletile kan_singletile = mypai[0].get_ordertile(tile_out);
-													if (kan_singletile.type != -1 && !(mypai[0].get_tile_status(kan_singletile) & TILE_INVALID))
-													{
-														for (int i = 0; i < PossibleKanSum; i++)
-															if (kan_singletile == PossibleKanTiles[i])
-																FinalKanIndex = i;
-														if (PlusKan & (1 << FinalKanIndex))
-															for (int FuluIndex = 0; FuluIndex < tempmypai.get_fulusum(); FuluIndex ++)
-															{
-																fulugroup tempGroup = tempmypai.get_fulu(FuluIndex);
-																if (tempGroup.thistype == ke && tempmypai.get_tilenum(tempGroup.keytype, tempGroup.key) == 1)
-																	FinalPlusKanFuluIndex = FuluIndex;
-															}
-														ChooseKan = false;
-													}
+													kan_singletile = mypai[0].get_ordertile(tile_out);
+													pKanTileFrom = &mypai[0];
 												}
+												if (kan_singletile.type != -1 && ((pKanTileFrom->get_tile_status(kan_singletile) & TILE_INVALID) == 0))
+												{
+													for (int i = 0; i < PossibleKanSum; i++)
+														if (kan_singletile == PossibleKanTiles[i])
+															FinalKanIndex = i;
+													ChooseKan = false;
+												}
+												tile_out = -1;
 											}
-											tile_out = -1;
 										}
 										if (!ChooseKan)
 										{
-											singletile FinalKanTile = PossibleKanTiles[FinalKanIndex];
-											if (FinalPlusKanFuluIndex == -1)
-											{
-												groupinfo NewFulu(ankan, FinalKanTile.type, FinalKanTile.num);
-												mypai[0].add_fulu(NewFulu);
-											}
-											else
-											{
-												fulugroup NewFulu(kan, FinalKanTile.type, FinalKanTile.num, -1, mypai[0].get_fulu(FinalPlusKanFuluIndex).seat_pos);
-												mypai[0].delete_fulu(FinalPlusKanFuluIndex);
-												mypai[0].add_fulu(NewFulu, FinalPlusKanFuluIndex);
-											}
-											mypai[0].change_tilenum(FinalKanTile, -4);
-											NewTile.change_tilenum(FinalKanTile, -4);
-											if (NewTile.get_tilesum() > 0)
-												mypai[0].change_tilenum(NewTile.get_ordertile(0), 1);
-											NewTile.reset_all();
-											GetKanInfo = false;
-											Kan = false;
-											PossibleKanSum = 0;
-											match_info.kansum ++;
-											robot[0].add_paistatus(PAI_STATUS_RINSHAN);
-											if (FinalPlusKanFuluIndex != -1 || ((FinalKanTile.type == 3 || FinalKanTile.num == 0 || FinalKanTile.num == 8) && ChanAnKan))
-											{
-												match_info.chankan_possible = true;
-												match_info.active_tile = FinalKanTile;
-												analysis_begin = false;
-												tileout_completed = true;
-											}
-											else
-											{
-												mopai = true;
-												for (int seat = 0; seat < 4; seat ++)
-													robot[seat].remove_paistatus(PAI_STATUS_IPPATSU);
-												match_info.tenhou_possible = false;
-											}
+											SpecialAction.ActionDirection = MySeat;
+											SpecialAction.ActionType = RESPONSE_KAN;
+											match_info.active_tile = PossibleKanTiles[FinalKanIndex];
 											tempmypai.post_stop_analysis();
 											analysis_completed = false;
 											mypai[0].remove_tile_status(TILE_RECOMMEND);
 											mypai[0].remove_tile_status(TILE_INVALID);
 											NewTile.remove_tile_status(TILE_INVALID);
-											MakeRefresh = true;
-											if ((robot[0].get_paistatus() & PAI_STATUS_RIICHI) != 0)
-											{
-												for (int type_num = 0; type_num < 37; type_num ++)
-												{
-													if (type_num % 10 == 9) continue;
-													mypai[0].add_tile_status(type_num / 10, type_num % 10, TILE_INVALID);
-												}
-												NewTile.remove_tile_status(TILE_INVALID);
-											}
+											GetKanInfo = false;
+											Kan = false;
 										}
 									}			
-									
 									// 正常出牌	
 									if (!Chi && !Kan && tile_out != -1)							
 									{
@@ -2554,6 +2488,57 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								}
 								else
 								{
+									singletile FinalKanTile = match_info.active_tile;
+									int FinalPlusKanFuluIndex = -1;
+									for (int FuluIndex = 0; FuluIndex < tempmypai.get_fulusum(); FuluIndex ++)
+									{
+										fulugroup tempGroup = tempmypai.get_fulu(FuluIndex);
+										if (tempGroup.thistype == ke && tempmypai.get_tilenum(tempGroup.keytype, tempGroup.key) == 1)
+											FinalPlusKanFuluIndex = FuluIndex;
+									}
+									if (FinalPlusKanFuluIndex == -1)
+									{
+										groupinfo NewFulu(ankan, FinalKanTile.type, FinalKanTile.num);
+										mypai[0].add_fulu(NewFulu);
+									}
+									else
+									{
+										fulugroup NewFulu(kan, FinalKanTile.type, FinalKanTile.num, -1, mypai[0].get_fulu(FinalPlusKanFuluIndex).seat_pos);
+										mypai[0].delete_fulu(FinalPlusKanFuluIndex);
+										mypai[0].add_fulu(NewFulu, FinalPlusKanFuluIndex);
+									}
+									mypai[0].change_tilenum(FinalKanTile, -4);
+									NewTile.change_tilenum(FinalKanTile, -4);
+									if (NewTile.get_tilesum() > 0)
+										mypai[0].change_tilenum(NewTile.get_ordertile(0), 1);
+									NewTile.reset_all();
+											
+									match_info.kansum ++;
+									robot[0].add_paistatus(PAI_STATUS_RINSHAN);
+									if (FinalPlusKanFuluIndex != -1 || ((FinalKanTile.type == 3 || FinalKanTile.num == 0 || FinalKanTile.num == 8) && ChanAnKan))
+									{
+										match_info.chankan_possible = true;
+										analysis_begin = false;
+										tileout_completed = true;
+									}
+									else
+									{
+										mopai = true;
+										for (int seat = 0; seat < 4; seat ++)
+											robot[seat].remove_paistatus(PAI_STATUS_IPPATSU);
+										match_info.tenhou_possible = false;
+									}
+											
+									MakeRefresh = true;
+									if ((robot[0].get_paistatus() & PAI_STATUS_RIICHI) != 0)
+									{
+										for (int type_num = 0; type_num < 37; type_num ++)
+										{
+											if (type_num % 10 == 9) continue;
+											mypai[0].add_tile_status(type_num / 10, type_num % 10, TILE_INVALID);
+										}
+										NewTile.remove_tile_status(TILE_INVALID);
+									}
 								}
 							}
 							break;
@@ -2952,4 +2937,32 @@ void CMahjongSpiritDlg::UpdateRules(bool FromMain)
 	else
 		for (int i = 0; i < DataNum; i++)
 			memcpy(MainData[i], SettingDlgData[i], DataSize[i]);
+}
+
+
+void CMahjongSpiritDlg::OnSize(UINT nType, int cx, int cy)
+{
+	CDialogEx::OnSize(nType, cx, cy);
+	NowDlgWidth = cx;
+	NowDlgHeight = cy;
+	
+	if (dlg_width != 0 && dlg_height != 0)
+	{
+		CDC *pCDC = GetDC();
+		if (NowDlgWidth * dlg_height / dlg_width < NowDlgHeight)
+		{
+			NowDlgHeight = NowDlgWidth * dlg_height / dlg_width;
+			pCDC->SetViewportOrg(0, NowDlgHeight * dlg_width / dlg_height / 2);
+		}
+		else
+		{
+			NowDlgWidth = NowDlgHeight * dlg_width / dlg_height;
+			pCDC->SetViewportOrg(NowDlgWidth * dlg_height / dlg_width / 2, 0);
+		}
+		pCDC->SetMapMode(MM_ISOTROPIC);
+		ReleaseDC(pCDC);
+	}
+
+	// TODO: 在此处添加消息处理程序代码
+
 }
