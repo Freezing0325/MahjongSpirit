@@ -22,7 +22,7 @@ protected:
 public:
 	int MatchFormat;		//赛制设定，0：东风战无限循环，1：东风战，2：半庄，3：全庄
 	bool DoubleWindTile;	//连风对子符数，true为4符，false为2符
-	bool OpenQuadRenShan;	//大明杠岭上开花包牌
+	bool OpenQuadRinShan;	//大明杠岭上开花包牌
 	bool DrawMangan;		//流局满贯
 	bool NineOrphans;		//九种九牌流局
 	bool NegativeEnd;		//击飞（负分结束）

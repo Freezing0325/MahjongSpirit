@@ -1468,6 +1468,7 @@ hupaiinfo pai::ifhu(singletile lasttile, bool test, UINT nFlags, matchinfo match
 
 	int groupsum = 0, DuiZiSum = 0, YaoJiuSum = 0;	// 牌组总数，对子总数，幺九牌总数
 	bool ShiSanYao = true, QiDuiZi = false, normalhu = false, PingHu = true;		// 和牌牌型是否为十三幺、七对子、正常和牌、平和
+	bool RealQiDuiZi = true;			// 是否为真正的七对子，不是龙七对
 	tileinfo_ex typeinfo[2][4];						//typeinfo[0]存储不含将牌时的信息；typeinfo[1]存储含将牌时的信息。
 	hupaiinfo result = {false, ""};
 	tiles alltile = *this;		// 加上副露后的牌总数
@@ -1546,8 +1547,19 @@ hupaiinfo pai::ifhu(singletile lasttile, bool test, UINT nFlags, matchinfo match
 			DuiZiSum += typeinfo[0][i].duizi;
 		if (DuiZiSum >= 7)
 		{
-			result.ifhupai = true;
 			QiDuiZi = true;
+			int RealDuiZiSum = 0;
+			for (int TypeNum = 0; TypeNum < 37; TypeNum ++)
+			{
+				if (TypeNum % 10 == 9) continue;
+				if (this->get_tilenum(TypeNum / 10, TypeNum % 10) >= 2) RealDuiZiSum ++;
+			}
+			if (RealDuiZiSum >= 7)
+			{
+				RealQiDuiZi = true;
+				result.ifhupai = true;
+			}
+			
 		}
 		
 		for (int k = 0; k < 4 && !normalhu; k ++)				//有将牌的那一种花色
@@ -1746,7 +1758,7 @@ hupaiinfo pai::ifhu(singletile lasttile, bool test, UINT nFlags, matchinfo match
 			{
 				if (normalhu)	// 同时还能作为正常和牌处理的七对子其实是两杯口
 					strcat_s(result.fanzhong, strlen(result.fanzhong) + 8, "两杯口 ");
-				else
+				else if (RealQiDuiZi)
 					strcat_s(result.fanzhong, strlen(result.fanzhong) + 8, "七对子 ");
 			}
 			if (SingleTypeSum[3] == FinalTileSum)
@@ -1846,8 +1858,12 @@ hupaiinfo pai::ifhu(singletile lasttile, bool test, UINT nFlags, matchinfo match
 					for (int i = 0; i < hutile.groupsum - fulu.groupsum - 1; i++)
 						if (hutile.allgroup[i] == hutile.allgroup[i + 1])
 						{
-							if (i < 2 && hutile.allgroup[i + 1] == hutile.allgroup[i + 2] && (lasttile.type != hutile.allgroup[i].keytype || lasttile.num != hutile.allgroup[i].key && lasttile.num != hutile.allgroup[i].key + 1 && lasttile.num != hutile.allgroup[i].key + 2))
+							if (i < 2 && hutile.allgroup[i + 1] == hutile.allgroup[i + 2] 
+							&& (lasttile.type != hutile.allgroup[i].keytype || (lasttile.num != hutile.allgroup[i].key && lasttile.num != hutile.allgroup[i].key + 1 && lasttile.num != hutile.allgroup[i].key + 2)))
+							{
 								strcat_s(result.fanzhong, strlen(result.fanzhong) + 8, "三暗刻 ");
+								ankenum += 3;
+							}
 							else if (strstr(result.fanzhong, "三暗刻") == NULL && fulu.feimenqing == false)
 								strcat_s(result.fanzhong, strlen(result.fanzhong) + 8, "一杯口 ");
 						}
@@ -2071,7 +2087,7 @@ hupaiinfo pai::ifhu(singletile lasttile, bool test, UINT nFlags, matchinfo match
 		// 自己是庄家
 		if ((self_direction - match_info.this_dealer + 4) % 4 == east)
 		{
-			if(tsumo && !(match_info.OpenQuadRenShan && match_info.OpenQuadRenShanFlag))
+			if(tsumo && !(match_info.OpenQuadRinShan && match_info.OpenQuadRinShanFlag))
 			{
 				_itoa_s(get_point.dealer_point, tempnum, 10);
 				strcat_s(get_point_info, strlen(get_point_info) + strlen(tempnum) + 1, tempnum);
@@ -2089,7 +2105,7 @@ hupaiinfo pai::ifhu(singletile lasttile, bool test, UINT nFlags, matchinfo match
 		// 自己是闲家
 		else
 		{
-			if(tsumo && !(match_info.OpenQuadRenShan && match_info.OpenQuadRenShanFlag))
+			if(tsumo && !(match_info.OpenQuadRinShan && match_info.OpenQuadRinShanFlag))
 			{
 				_itoa_s(get_point.normal_point, tempnum, 10);
 				strcat_s(get_point_info, strlen(get_point_info) + strlen(tempnum) + 1, tempnum);

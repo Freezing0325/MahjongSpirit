@@ -24,6 +24,7 @@
 //20240611_0221：实现了大明杠包牌的机制，所有规则均可实现。接下来进行实际测试。自己开暗杠与加杠没有动画显示，此前可能忘记搬运了。
 //20240611_1220：实现了开暗杠和加杠的动画显示。接下来要进行窗口大小的调整。
 //20240611_2202：实现了窗口大小的调整，目前窗口增大到了1800*1000，还存在一些BUG，如龙七对的判断，以及四暗刻会判定为三暗刻混一色。
+//20240612_1215：修复了龙七对的BUG和四暗刻的BUG，修复了无役自摸的BUG，准备发布Release版。
 
 #include "stdafx.h"
 
@@ -195,7 +196,7 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	NoNeedLogin = true;
 
 	ThisSeed = (unsigned int)time(NULL);
-	ThisSeed = 1718041776;
+	//ThisSeed = 1718041776;
 	/*
 	一些种子：
 	1689440075：开局会有很多碰牌
@@ -210,7 +211,7 @@ BOOL CMahjongSpiritDlg::OnInitDialog()
 	OnGamesettingReset();
 	AllRobot = nullptr;
 	pHupaiInfo = nullptr;
-	MyTiles = RinShanTiles;
+	//MyTiles = RinShanTiles;
 	//MyTiles = ThirteenOrphans; // NineGates;
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -770,7 +771,7 @@ void CMahjongSpiritDlg::OnPaint()
 					if (match_info.win_direction != noneed && match_info.frame_status == FRAME_WIN)
 					{
 						getpointinfo AllGetPointInfo = pHupaiInfo->getpoint();
-						if (match_info.active_direction == match_info.win_direction && !(match_info.OpenQuadRenShanFlag && match_info.OpenQuadRenShan)) // 自摸
+						if (match_info.active_direction == match_info.win_direction && !(match_info.OpenQuadRinShanFlag && match_info.OpenQuadRinShan)) // 自摸
 						{
 							pChangePoints[match_info.win_direction] = 1000 * match_info.RiichiBarSum;
 							match_info.RiichiBarSum = 0;
@@ -794,7 +795,7 @@ void CMahjongSpiritDlg::OnPaint()
 						{
 							direction LoseDirection;
 							// 大明杠后最终岭上开花（中途可有连杠），则找到那个大明杠的来源作为输家包牌，若恰好立直则不予退还立直棒
-							if (match_info.OpenQuadRenShanFlag && match_info.OpenQuadRenShan)
+							if (match_info.OpenQuadRinShanFlag && match_info.OpenQuadRinShan)
 							{
 								fuluinfo ThisFulu = AllRobot[match_info.win_direction].get_pai().get_fuluinfo();
 								int FuluSum = ThisFulu.groupsum;
@@ -1293,7 +1294,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 					tempmypai.reset_all();
 					Choosing = false;
 					ChooseFlags = 0x0;
-					match_info.OpenQuadRenShanFlag = false;
+					match_info.OpenQuadRinShanFlag = false;
 					
 					win = false;
 					Chi = false;
@@ -1517,7 +1518,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								{
 									SpecialAction.ActionDirection = PonDirection;
 									SpecialAction.ActionType = OtherResponse[(PonDirection + 3 - match_info.active_direction) % 4].response;
-									if (SpecialAction.ActionType == RESPONSE_KAN) match_info.OpenQuadRenShanFlag = true;
+									if (SpecialAction.ActionType == RESPONSE_KAN) match_info.OpenQuadRinShanFlag = true;
 									if ((OtherResponse[0].response & RESPONSE_CHI) != 0) robot[(match_info.active_direction + 1) % 4].abandon_response();
 									Chi = false;
 									ChooseFlags = 0x0;
@@ -1628,7 +1629,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								if (Kan && match_info.active_direction != MySeat)
 								{
 									SpecialAction.ActionType = RESPONSE_KAN;
-									match_info.OpenQuadRenShanFlag = true;
+									match_info.OpenQuadRinShanFlag = true;
 									Kan = false;
 								}
 								if ((ChooseFlags & CHOOSE_HU) && !win)
@@ -1742,7 +1743,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 											}
 										}
 									}
-									if (match_info.OpenQuadRenShanFlag && MyTiles == RinShanTiles)
+									if (match_info.OpenQuadRinShanFlag && MyTiles == RinShanTiles)
 									{
 										gettile = RinShanTileGet[RinShanTileNum++];
 										if (RinShanTileNum == 3) RinShanTileNum = 0;
@@ -1845,7 +1846,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 								}
 								if (tempmypai.ifhu().ifhupai)
 								{
-									UINT TempHuFlags;
+									UINT TempHuFlags = 0;
 									TempHuFlags |= HU_TSUMO;
 									TempHuFlags |= HU_RINSHAN * ((robot[0].get_paistatus() & PAI_STATUS_RINSHAN) != 0);
 									TempHuFlags |= HU_HAITEI * (remaintiles.get_tilesum() == 4);
@@ -1970,7 +1971,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 										robot[match_info.active_direction].act(match_info);
 										mypai[match_info.active_direction] = robot[match_info.active_direction].get_pai();
 										tileout_completed = true;
-										match_info.OpenQuadRenShanFlag = false;
+										match_info.OpenQuadRinShanFlag = false;
 										analysis_begin = false;
 										MakeRefresh = true;
 									}
@@ -2356,7 +2357,7 @@ void CMahjongSpiritDlg::OnTimer(UINT_PTR nIDEvent)
 											match_info.active_tile = out_singletile;
 											tile_selected = -1;
 											IfShowTenpaiHint = false;
-											match_info.OpenQuadRenShanFlag = false;
+											match_info.OpenQuadRinShanFlag = false;
 										}
 										tile_out = -1;
 									}
@@ -2951,12 +2952,12 @@ void CMahjongSpiritDlg::OnGamesettingReset()
 void CMahjongSpiritDlg::UpdateRules(bool FromMain)
 {
 	void* MainData[] = {&MatchFormat, &TopBonus, &OriginPoints, &RankHorse_1, &RankHorse_2, &BackPoints,
-	&NineOrphans, &ChanAnKan, &match_info.DoubleWindTile, &match_info.OpenQuadRenShan, &DrawMangan, &NegativeEnd};
+	&NineOrphans, &ChanAnKan, &match_info.DoubleWindTile, &match_info.OpenQuadRinShan, &DrawMangan, &NegativeEnd};
 	void* SettingDlgData[] = {
 		&pRulesSettingsDlg->MatchFormat, &pRulesSettingsDlg->TopBonus, &pRulesSettingsDlg->OriginPoints, 
 		&pRulesSettingsDlg->RankHorse_1, &pRulesSettingsDlg->RankHorse_2, &pRulesSettingsDlg->BackMarks,
 		&pRulesSettingsDlg->NineOrphans, &pRulesSettingsDlg->ChanAnKan, &pRulesSettingsDlg->DoubleWindTile, 
-		&pRulesSettingsDlg->OpenQuadRenShan, &pRulesSettingsDlg->DrawMangan, &pRulesSettingsDlg->NegativeEnd
+		&pRulesSettingsDlg->OpenQuadRinShan, &pRulesSettingsDlg->DrawMangan, &pRulesSettingsDlg->NegativeEnd
 	};
 	int DataSize[] = {1, 1, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1};
 	int DataNum = sizeof(SettingDlgData) / sizeof(void*);

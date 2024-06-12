@@ -184,8 +184,8 @@ struct matchinfo
 	direction active_direction;	//当前活跃者
 	singletile active_tile;		//当前活跃牌
 	bool chankan_possible;		//是否处于可以抢杠的状态
-	bool OpenQuadRenShan;		//是否允许大明杠包牌
-	bool OpenQuadRenShanFlag;	//大明杠包牌的标志符
+	bool OpenQuadRinShan;		//是否允许大明杠包牌
+	bool OpenQuadRinShanFlag;	//大明杠包牌的标志符
 	int RiichiBarSum;			//当前场上立直棒的总数
 	bool DoubleWindTile;		//连风对子是否记4符
 	void print_dora(const HDC &hdc, const POINT &printpos, const BYTE &ura_visible = 0);
